@@ -19,6 +19,27 @@ Run the demo:
 go run ./cmd/app
 ```
 
+Run the HTTP server (default `:8080`, seeds `sku-1` with stock 1, sweeps
+expired reservations every 10s):
+
+```sh
+go run ./cmd/server
+# custom: go run ./cmd/server --addr=:9000 --seed="sku-1:5,sku-2:2" --hold=2m
+```
+
+Endpoints:
+
+| Method | Path                              | Description            |
+|--------|-----------------------------------|------------------------|
+| POST   | `/reservations`                   | Reserve one unit       |
+| POST   | `/reservations/{id}/confirm`      | Confirm a reservation  |
+| POST   | `/reservations/{id}/cancel`       | Cancel a reservation   |
+| GET    | `/reservations/{id}`              | Fetch a reservation    |
+| GET    | `/products/{id}/stock`            | Available stock        |
+| GET    | `/healthz`                        | Liveness probe         |
+
+`make` targets: `make vet`, `make test`, `make race`, `make demo`, `make server`.
+
 ## Architecture
 
 ```
