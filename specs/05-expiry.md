@@ -35,7 +35,8 @@ ExpireReservations(ctx context.Context, now time.Time) int
 | Rule  | Test(s) | Implementation |
 |-------|---------|----------------|
 | EX-R1, EX-R2 | `TestExpireReservations_ReleasesExpiredStock` | `ReservationService.ExpireReservations`, `expireReservationLocked` |
-| EX-R3 | `TestConfirmAfterExpiry_Fails` (indirect) | `ReservationService.expireForProductLocked` |
+| EX-R3 | `TestReserveAfterExpiry_FreesSlot` | `ReservationService.expireForProductLocked` |
+| EX-R4 | `TestExpireReservations_Idempotent` | `ReservationService.ExpireReservations` |
 | EX-R5 | `TestReserveItem_500Concurrent_Stock1` + `go test -race` | `LockManager.With` |
 
 ## Out of scope

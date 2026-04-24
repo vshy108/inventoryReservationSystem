@@ -39,4 +39,4 @@ ReserveItem(ctx context.Context, productID, userID string) (Reservation, error)
 | RI-R1 | `TestReserveItem_UnknownProduct` | `ReservationService.ReserveItem` |
 | RI-R2 | `TestReserveItem_FailsWhenStockUnavailable` | `ReservationService.ReserveItem` |
 | RI-R3 | `TestReserveItem_SucceedsWhenStockAvailable` | `ReservationService.ReserveItem` |
-| RI-R4 | Indirect: `TestExpireReservations_ReleasesExpiredStock` + reserve after expiry (see Level 2) | `ReservationService.expireForProductLocked` |
+| RI-R4 | `TestReserveAfterExpiry_FreesSlot` | `ReservationService.expireForProductLocked` |

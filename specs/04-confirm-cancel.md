@@ -46,7 +46,10 @@ CancelReservation(ctx context.Context, reservationID string) (Reservation, error
 ## Traceability
 | Rule  | Test(s) | Implementation |
 |-------|---------|----------------|
+| CC-R1 | `TestReserveItem_500Concurrent_Stock1` (race-tested) | `LockManager.With` |
 | CC-R2 | `TestConfirmReservation_Finalizes` | `ReservationService.ConfirmReservation` |
 | CC-R3 | `TestConfirmAfterExpiry_Fails` | `ReservationService.ConfirmReservation` |
-| CC-R4 | `TestConfirmReservation_DoubleConfirm` | `ReservationService.ConfirmReservation` |
+| CC-R4 | `TestConfirmReservation_DoubleConfirm`, `TestConfirmCancel_UnknownID` | `ReservationService.ConfirmReservation` |
 | CC-R5 | `TestCancelReservation_ReleasesStock` | `ReservationService.CancelReservation` |
+| CC-R6 | `TestCancel_Confirmed_Fails`, `TestCancelThenReReserve_Succeeds` | `ReservationService.CancelReservation` |
+| CC-R7 | `TestConfirmReservation_DoubleConfirm` | `ReservationService.ConfirmReservation` |

@@ -263,3 +263,47 @@ func TestInventoryEventLog_RecordsTransitions(t *testing.T) {
 		}
 	}
 }
+
+// EX-R4: ExpireReservations is idempotent; running twice at the same now
+// returns 0 the second time and does not double-release stock.
+func TestExpireReservations_Idempotent(t *testing.T) {
+	svc, clk := newSvc(t, "p1", 1)
+	if _, err := svc.ReserveItem(context.Background(), "p1", "userA"); err != nil {
+		t.Fatalf("reserve: %v", err)
+	}
+	clk.Advance(3 * time.Minute)
+	if n := svc.ExpireReservations(context.Background(), clk.Now()); n != 1 {
+		t.Fatalf("first sweep: want 1, got %d", n)
+	}
+	if n := svc.ExpireReservations(context.Background(), clk.Now()); n != 0 {
+		t.Fatalf("second sweep: want 0, got %d", n)
+	}
+	avail, _ := svc.GetAvailableStock(context.Background(), "p1")
+	if avail != 1 {
+		t.Errorf("want available=1 after idempotent sweep, got %d", avail)
+	}
+}
+
+// CC-R6: Cancelling a non-Active reservation returns ErrReservationAlreadyFinalized.
+func TestCancel_Confirmed_Fails(t *testing.T) {
+	svc, _ := newSvc(t, "p1", 1)
+	res, _ := svc.ReserveItem(context.Background(), "p1", "userA")
+	if _, err := svc.ConfirmReservation(context.Background(), res.ReservationID); err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+	_, err := svc.CancelReservation(context.Background(), res.ReservationID)
+	if !errors.Is(err, domain.ErrReservationAlreadyFinalized) {
+		t.Fatalf("want ErrReservationAlreadyFinalized, got %v", err)
+	}
+}
+
+// CC/RL unknown id branches.
+func TestConfirmCancel_UnknownID(t *testing.T) {
+	svc, _ := newSvc(t, "p1", 1)
+	if _, err := svc.ConfirmReservation(context.Background(), "nope"); !errors.Is(err, domain.ErrReservationNotFound) {
+		t.Errorf("confirm unknown: want ErrReservationNotFound, got %v", err)
+	}
+	if _, err := svc.CancelReservation(context.Background(), "nope"); !errors.Is(err, domain.ErrReservationNotFound) {
+		t.Errorf("cancel unknown: want ErrReservationNotFound, got %v", err)
+	}
+}

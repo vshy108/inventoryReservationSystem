@@ -48,5 +48,5 @@ transition on `ProductInventory`.
 | RL-R2 | `TestConfirmReservation_Finalizes` | `ReservationService.ConfirmReservation` |
 | RL-R3 | `TestCancelReservation_ReleasesStock` | `ReservationService.CancelReservation` |
 | RL-R4 | `TestExpireReservations_ReleasesExpiredStock` | `ReservationService.ExpireReservations` |
-| RL-R5 | `TestConfirmReservation_DoubleConfirm` | `ReservationService.ConfirmReservation` |
+| RL-R5 | `TestConfirmReservation_DoubleConfirm`, `TestCancel_Confirmed_Fails` | `ReservationService.ConfirmReservation`, `CancelReservation` |
 | RL-R6 | `TestConfirmAfterExpiry_Fails` | `ReservationService.ConfirmReservation` |

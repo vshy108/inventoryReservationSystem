@@ -28,5 +28,7 @@ Define how available stock is derived from a `ProductInventory`.
 ## Traceability
 | Rule  | Test(s) | Implementation |
 |-------|---------|----------------|
-| SF-R1 | Covered by `TestReserveItem_*`, `TestCancelReservation_ReleasesStock` | `internal/domain/inventory.go: AvailableStock` |
+| SF-R1 | `TestAvailableStock_Formula` (SF-S1/S2/S3), `TestReserveItem_*`, `TestCancelReservation_ReleasesStock` | `internal/domain/inventory.go: AvailableStock` |
 | SF-R2 | `TestReserveItem_FailsWhenStockUnavailable`, `TestReserveItem_500Concurrent_Stock1` | `internal/application/reservation_service.go: ReserveItem` |
+| SF-R3 | Enforced by SF-R2 + RL-R2..R4 (counters only decrement from positive) | `ReservationService.*Reservation` |
+| SF-R4 | No restock API exists | `internal/domain/inventory.go` |
