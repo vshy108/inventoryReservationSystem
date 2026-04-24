@@ -94,6 +94,30 @@ interface  ->  application  ->  domain
 - **Confirmed is final.** The brief says confirmed purchases cannot be
   reversed, so `Confirm` has no inverse.
 
+## TDD Approach
+
+Specs in [specs/](specs/) define the rules first; every rule has a
+direct test in the traceability table above. The initial Level 1/2/3
+scaffold was committed together (`816dcf1`) to keep the baseline
+compilable, but each subsequent feature followed a **test-paired
+commit flow**:
+
+- `91a34b0 docs(specs): add spec files with traceability to tests` —
+  specs authored before the corresponding extension features.
+- `14d3346 feat(domain): add inventory event log and extended tests` —
+  event log code and its tests (`TestInventoryEventLog_RecordsTransitions`,
+  `TestReserveAfterExpiry_FreesSlot`, `TestCancelThenReReserve_Succeeds`,
+  `TestMultiProduct_Isolation`) added together.
+- `74c62ed test,docs(specs): fulfill all spec rules with direct tests` —
+  new tests drove the spec traceability tightening.
+- `cb324f8 feat(events,ci): align event schema with spec, add lint job` —
+  `TestReserveRejected_EmitsEvent` drove the `ReserveRejected`
+  event type; `TestReserveItem_RepeatedConcurrencyDeterminism` was
+  added as the determinism gate from the Level 3 plan.
+
+`go test -race ./...` is the non-negotiable gate; it is wired into CI
+and has passed on every commit on `main`.
+
 ## Pre-submission Checklist
 
 - [x] `go vet ./...` clean
