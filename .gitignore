@@ -1,4 +1,6 @@
 bin/
+server
+/app
 coverage.out
 *.test
 .DS_Store
