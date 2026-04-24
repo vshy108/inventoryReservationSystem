@@ -3,7 +3,7 @@ package infrastructure
 import (
 	"sync"
 
-	"github.com/vshy108/inventoryReservationSystem/internal/domain"
+	"everest/inventoryReservation/internal/domain"
 )
 
 // InMemoryRepository stores products and reservations in memory.

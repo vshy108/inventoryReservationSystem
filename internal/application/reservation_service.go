@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/vshy108/inventoryReservationSystem/internal/domain"
-	"github.com/vshy108/inventoryReservationSystem/internal/infrastructure"
+	"everest/inventoryReservation/internal/domain"
+	"everest/inventoryReservation/internal/infrastructure"
 )
 
 // DefaultHoldDuration is the reservation hold time from the brief.

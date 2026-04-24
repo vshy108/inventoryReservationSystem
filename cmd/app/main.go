@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/vshy108/inventoryReservationSystem/internal/application"
-	"github.com/vshy108/inventoryReservationSystem/internal/domain"
-	"github.com/vshy108/inventoryReservationSystem/internal/infrastructure"
+	"everest/inventoryReservation/internal/application"
+	"everest/inventoryReservation/internal/domain"
+	"everest/inventoryReservation/internal/infrastructure"
 )
 
 func main() {

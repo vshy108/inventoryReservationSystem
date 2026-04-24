@@ -1,3 +1,3 @@
-module github.com/vshy108/inventoryReservationSystem
+module everest/inventoryReservation
 
 go 1.23.0
