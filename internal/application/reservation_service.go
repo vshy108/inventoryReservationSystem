@@ -73,6 +73,13 @@ func (s *ReservationService) ReserveItem(_ context.Context, productID, userID st
 			p.ActiveReservationCount++
 			return nil
 		})
+		s.repo.AppendEvent(domain.InventoryEvent{
+			Type:          domain.EventReserved,
+			ReservationID: res.ReservationID,
+			ProductID:     res.ProductID,
+			UserID:        res.UserID,
+			OccurredAt:    now,
+		})
 		result = res
 	})
 	return result, err
@@ -120,6 +127,13 @@ func (s *ReservationService) ConfirmReservation(_ context.Context, reservationID
 			p.ConfirmedCount++
 			return nil
 		})
+		s.repo.AppendEvent(domain.InventoryEvent{
+			Type:          domain.EventConfirmed,
+			ReservationID: current.ReservationID,
+			ProductID:     current.ProductID,
+			UserID:        current.UserID,
+			OccurredAt:    now,
+		})
 	})
 	return result, err
 }
@@ -153,6 +167,13 @@ func (s *ReservationService) CancelReservation(_ context.Context, reservationID 
 		_ = s.repo.UpdateProduct(current.ProductID, func(p *domain.ProductInventory) error {
 			p.ActiveReservationCount--
 			return nil
+		})
+		s.repo.AppendEvent(domain.InventoryEvent{
+			Type:          domain.EventCancelled,
+			ReservationID: current.ReservationID,
+			ProductID:     current.ProductID,
+			UserID:        current.UserID,
+			OccurredAt:    now,
 		})
 	})
 	return result, err
@@ -208,6 +229,13 @@ func (s *ReservationService) expireReservationLocked(reservationID string, now t
 		p.ActiveReservationCount--
 		return nil
 	})
+	s.repo.AppendEvent(domain.InventoryEvent{
+		Type:          domain.EventExpired,
+		ReservationID: current.ReservationID,
+		ProductID:     current.ProductID,
+		UserID:        current.UserID,
+		OccurredAt:    now,
+	})
 	return true
 }
 
@@ -223,4 +251,9 @@ func (s *ReservationService) GetAvailableStock(_ context.Context, productID stri
 // GetReservation returns a reservation by ID.
 func (s *ReservationService) GetReservation(_ context.Context, reservationID string) (domain.Reservation, bool) {
 	return s.repo.GetReservation(reservationID)
+}
+
+// Events returns a copy of the append-only inventory event log.
+func (s *ReservationService) Events() []domain.InventoryEvent {
+	return s.repo.AllEvents()
 }

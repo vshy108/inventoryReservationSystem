@@ -14,6 +14,7 @@ type InMemoryRepository struct {
 	mu           sync.RWMutex
 	products     map[string]*domain.ProductInventory
 	reservations map[string]*domain.Reservation
+	events       []domain.InventoryEvent
 }
 
 // NewInMemoryRepository constructs an empty repository.
@@ -21,7 +22,24 @@ func NewInMemoryRepository() *InMemoryRepository {
 	return &InMemoryRepository{
 		products:     make(map[string]*domain.ProductInventory),
 		reservations: make(map[string]*domain.Reservation),
+		events:       make([]domain.InventoryEvent, 0),
 	}
+}
+
+// AppendEvent records an immutable inventory event.
+func (r *InMemoryRepository) AppendEvent(e domain.InventoryEvent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, e)
+}
+
+// AllEvents returns a copy of the append-only event log in insertion order.
+func (r *InMemoryRepository) AllEvents() []domain.InventoryEvent {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]domain.InventoryEvent, len(r.events))
+	copy(out, r.events)
+	return out
 }
 
 // AddProduct inserts or replaces a product inventory record.

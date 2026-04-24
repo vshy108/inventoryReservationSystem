@@ -159,3 +159,107 @@ func TestReserveItem_500Concurrent_Stock1(t *testing.T) {
 		t.Errorf("want available=0, got %d", avail)
 	}
 }
+
+func TestReserveAfterExpiry_FreesSlot(t *testing.T) {
+	svc, clk := newSvc(t, "p1", 1)
+	first, _ := svc.ReserveItem(context.Background(), "p1", "userA")
+	clk.Advance(3 * time.Minute)
+	// Lazy expiry inside ReserveItem should release the slot for userB.
+	second, err := svc.ReserveItem(context.Background(), "p1", "userB")
+	if err != nil {
+		t.Fatalf("second reserve after expiry: %v", err)
+	}
+	if second.ReservationID == first.ReservationID {
+		t.Fatalf("expected new reservation id, got same %s", first.ReservationID)
+	}
+	r1, _ := svc.GetReservation(context.Background(), first.ReservationID)
+	if r1.State != domain.StateExpired {
+		t.Errorf("want first Expired, got %s", r1.State)
+	}
+	avail, _ := svc.GetAvailableStock(context.Background(), "p1")
+	if avail != 0 {
+		t.Errorf("want available=0, got %d", avail)
+	}
+}
+
+func TestCancelThenReReserve_Succeeds(t *testing.T) {
+	svc, _ := newSvc(t, "p1", 1)
+	first, _ := svc.ReserveItem(context.Background(), "p1", "userA")
+	if _, err := svc.CancelReservation(context.Background(), first.ReservationID); err != nil {
+		t.Fatalf("cancel: %v", err)
+	}
+	second, err := svc.ReserveItem(context.Background(), "p1", "userB")
+	if err != nil {
+		t.Fatalf("reserve after cancel: %v", err)
+	}
+	if second.State != domain.StateActive {
+		t.Errorf("want Active, got %s", second.State)
+	}
+	// Cancelling an already-cancelled reservation is a finalized-state error.
+	_, err = svc.CancelReservation(context.Background(), first.ReservationID)
+	if !errors.Is(err, domain.ErrReservationAlreadyFinalized) {
+		t.Fatalf("want ErrReservationAlreadyFinalized, got %v", err)
+	}
+}
+
+func TestMultiProduct_Isolation(t *testing.T) {
+	repo := infrastructure.NewInMemoryRepository()
+	repo.AddProduct(domain.ProductInventory{ProductID: "p1", TotalStock: 1})
+	repo.AddProduct(domain.ProductInventory{ProductID: "p2", TotalStock: 1})
+	clk := infrastructure.NewFakeClock(time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC))
+	svc := application.NewReservationService(repo, infrastructure.NewLockManager(), clk, 2*time.Minute)
+
+	if _, err := svc.ReserveItem(context.Background(), "p1", "userA"); err != nil {
+		t.Fatalf("reserve p1: %v", err)
+	}
+	// p1 is full, but p2 should remain independent.
+	if _, err := svc.ReserveItem(context.Background(), "p1", "userB"); !errors.Is(err, domain.ErrOutOfStock) {
+		t.Fatalf("want ErrOutOfStock on p1, got %v", err)
+	}
+	if _, err := svc.ReserveItem(context.Background(), "p2", "userB"); err != nil {
+		t.Fatalf("reserve p2 should succeed: %v", err)
+	}
+	a1, _ := svc.GetAvailableStock(context.Background(), "p1")
+	a2, _ := svc.GetAvailableStock(context.Background(), "p2")
+	if a1 != 0 || a2 != 0 {
+		t.Errorf("want p1=0 p2=0, got p1=%d p2=%d", a1, a2)
+	}
+}
+
+func TestInventoryEventLog_RecordsTransitions(t *testing.T) {
+	svc, clk := newSvc(t, "p1", 2)
+	r1, _ := svc.ReserveItem(context.Background(), "p1", "userA")
+	r2, _ := svc.ReserveItem(context.Background(), "p1", "userB")
+	if _, err := svc.ConfirmReservation(context.Background(), r1.ReservationID); err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+	if _, err := svc.CancelReservation(context.Background(), r2.ReservationID); err != nil {
+		t.Fatalf("cancel: %v", err)
+	}
+	r3, _ := svc.ReserveItem(context.Background(), "p1", "userC")
+	clk.Advance(3 * time.Minute)
+	if n := svc.ExpireReservations(context.Background(), clk.Now()); n != 1 {
+		t.Fatalf("want 1 expired, got %d", n)
+	}
+
+	events := svc.Events()
+	want := []struct {
+		typ domain.InventoryEventType
+		id  string
+	}{
+		{domain.EventReserved, r1.ReservationID},
+		{domain.EventReserved, r2.ReservationID},
+		{domain.EventConfirmed, r1.ReservationID},
+		{domain.EventCancelled, r2.ReservationID},
+		{domain.EventReserved, r3.ReservationID},
+		{domain.EventExpired, r3.ReservationID},
+	}
+	if len(events) != len(want) {
+		t.Fatalf("want %d events, got %d: %+v", len(want), len(events), events)
+	}
+	for i, w := range want {
+		if events[i].Type != w.typ || events[i].ReservationID != w.id {
+			t.Errorf("event[%d]: want {%s %s}, got {%s %s}", i, w.typ, w.id, events[i].Type, events[i].ReservationID)
+		}
+	}
+}
