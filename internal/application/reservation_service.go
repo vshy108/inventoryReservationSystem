@@ -41,6 +41,14 @@ func (s *ReservationService) nextID(prefix string) string {
 	return fmt.Sprintf("%s-%d", prefix, s.idCounter.Add(1))
 }
 
+// appendEvent records an inventory event with a generated EventID.
+func (s *ReservationService) appendEvent(e domain.InventoryEvent) {
+	e.EventID = s.nextID("evt")
+	s.repo.AppendEvent(e)
+}
+
+func strPtr(v string) *string { return &v }
+
 // ReserveItem atomically checks stock and creates an active reservation,
 // or returns ErrOutOfStock / ErrProductNotFound.
 func (s *ReservationService) ReserveItem(_ context.Context, productID, userID string) (domain.Reservation, error) {
@@ -58,6 +66,13 @@ func (s *ReservationService) ReserveItem(_ context.Context, productID, userID st
 		}
 		if product.AvailableStock() <= 0 {
 			err = domain.ErrOutOfStock
+			s.appendEvent(domain.InventoryEvent{
+				Type:       domain.EventReserveRejected,
+				ProductID:  productID,
+				UserID:     strPtr(userID),
+				Reason:     strPtr("out of stock"),
+				OccurredAt: now,
+			})
 			return
 		}
 		res := domain.Reservation{
@@ -73,11 +88,11 @@ func (s *ReservationService) ReserveItem(_ context.Context, productID, userID st
 			p.ActiveReservationCount++
 			return nil
 		})
-		s.repo.AppendEvent(domain.InventoryEvent{
+		s.appendEvent(domain.InventoryEvent{
 			Type:          domain.EventReserved,
-			ReservationID: res.ReservationID,
+			ReservationID: strPtr(res.ReservationID),
 			ProductID:     res.ProductID,
-			UserID:        res.UserID,
+			UserID:        strPtr(res.UserID),
 			OccurredAt:    now,
 		})
 		result = res
@@ -127,11 +142,11 @@ func (s *ReservationService) ConfirmReservation(_ context.Context, reservationID
 			p.ConfirmedCount++
 			return nil
 		})
-		s.repo.AppendEvent(domain.InventoryEvent{
+		s.appendEvent(domain.InventoryEvent{
 			Type:          domain.EventConfirmed,
-			ReservationID: current.ReservationID,
+			ReservationID: strPtr(current.ReservationID),
 			ProductID:     current.ProductID,
-			UserID:        current.UserID,
+			UserID:        strPtr(current.UserID),
 			OccurredAt:    now,
 		})
 	})
@@ -168,11 +183,11 @@ func (s *ReservationService) CancelReservation(_ context.Context, reservationID 
 			p.ActiveReservationCount--
 			return nil
 		})
-		s.repo.AppendEvent(domain.InventoryEvent{
+		s.appendEvent(domain.InventoryEvent{
 			Type:          domain.EventCancelled,
-			ReservationID: current.ReservationID,
+			ReservationID: strPtr(current.ReservationID),
 			ProductID:     current.ProductID,
-			UserID:        current.UserID,
+			UserID:        strPtr(current.UserID),
 			OccurredAt:    now,
 		})
 	})
@@ -229,11 +244,11 @@ func (s *ReservationService) expireReservationLocked(reservationID string, now t
 		p.ActiveReservationCount--
 		return nil
 	})
-	s.repo.AppendEvent(domain.InventoryEvent{
+	s.appendEvent(domain.InventoryEvent{
 		Type:          domain.EventExpired,
-		ReservationID: current.ReservationID,
+		ReservationID: strPtr(current.ReservationID),
 		ProductID:     current.ProductID,
-		UserID:        current.UserID,
+		UserID:        strPtr(current.UserID),
 		OccurredAt:    now,
 	})
 	return true

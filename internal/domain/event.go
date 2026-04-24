@@ -6,18 +6,24 @@ import "time"
 type InventoryEventType string
 
 const (
-	EventReserved  InventoryEventType = "Reserved"
-	EventConfirmed InventoryEventType = "Confirmed"
-	EventCancelled InventoryEventType = "Cancelled"
-	EventExpired   InventoryEventType = "Expired"
+	EventReserved        InventoryEventType = "Reserved"
+	EventReserveRejected InventoryEventType = "ReserveRejected"
+	EventConfirmed       InventoryEventType = "Confirmed"
+	EventCancelled       InventoryEventType = "Cancelled"
+	EventExpired         InventoryEventType = "Expired"
 )
 
-// InventoryEvent is an immutable record of a reservation state change.
-// Events are append-only and ordered by OccurredAt / insertion.
+// InventoryEvent is an immutable record of a reservation lifecycle event.
+// Events are append-only and ordered by insertion. ReservationID, UserID,
+// and Reason are pointers because not every event carries them (for
+// example, a ReserveRejected event has no reservation and may carry a
+// reason string).
 type InventoryEvent struct {
+	EventID       string
 	Type          InventoryEventType
-	ReservationID string
 	ProductID     string
-	UserID        string
+	ReservationID *string
+	UserID        *string
+	Reason        *string
 	OccurredAt    time.Time
 }

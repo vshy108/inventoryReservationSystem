@@ -258,8 +258,15 @@ func TestInventoryEventLog_RecordsTransitions(t *testing.T) {
 		t.Fatalf("want %d events, got %d: %+v", len(want), len(events), events)
 	}
 	for i, w := range want {
-		if events[i].Type != w.typ || events[i].ReservationID != w.id {
-			t.Errorf("event[%d]: want {%s %s}, got {%s %s}", i, w.typ, w.id, events[i].Type, events[i].ReservationID)
+		if events[i].Type != w.typ || events[i].ReservationID == nil || *events[i].ReservationID != w.id {
+			gotID := "<nil>"
+			if events[i].ReservationID != nil {
+				gotID = *events[i].ReservationID
+			}
+			t.Errorf("event[%d]: want {%s %s}, got {%s %s}", i, w.typ, w.id, events[i].Type, gotID)
+		}
+		if events[i].EventID == "" {
+			t.Errorf("event[%d]: EventID must be set", i)
 		}
 	}
 }
@@ -305,5 +312,75 @@ func TestConfirmCancel_UnknownID(t *testing.T) {
 	}
 	if _, err := svc.CancelReservation(context.Background(), "nope"); !errors.Is(err, domain.ErrReservationNotFound) {
 		t.Errorf("cancel unknown: want ErrReservationNotFound, got %v", err)
+	}
+}
+
+// A ReserveRejected event is recorded when a reservation fails due to ErrOutOfStock.
+func TestReserveRejected_EmitsEvent(t *testing.T) {
+	svc, _ := newSvc(t, "p1", 1)
+	if _, err := svc.ReserveItem(context.Background(), "p1", "userA"); err != nil {
+		t.Fatalf("reserve: %v", err)
+	}
+	if _, err := svc.ReserveItem(context.Background(), "p1", "userB"); !errors.Is(err, domain.ErrOutOfStock) {
+		t.Fatalf("want ErrOutOfStock, got %v", err)
+	}
+	events := svc.Events()
+	var rejected *domain.InventoryEvent
+	for i := range events {
+		if events[i].Type == domain.EventReserveRejected {
+			rejected = &events[i]
+			break
+		}
+	}
+	if rejected == nil {
+		t.Fatalf("expected a ReserveRejected event, got %+v", events)
+	}
+	if rejected.UserID == nil || *rejected.UserID != "userB" {
+		t.Errorf("want UserID=userB, got %v", rejected.UserID)
+	}
+	if rejected.Reason == nil || *rejected.Reason == "" {
+		t.Errorf("want a non-empty Reason, got %v", rejected.Reason)
+	}
+	if rejected.ReservationID != nil {
+		t.Errorf("ReserveRejected should not reference a reservation, got %v", *rejected.ReservationID)
+	}
+}
+
+// Determinism under repeated high-contention runs: every run with stock=N
+// and K>N concurrent requests yields exactly N successes.
+func TestReserveItem_RepeatedConcurrencyDeterminism(t *testing.T) {
+	const runs = 10
+	const N = 3
+	const K = 200
+	for run := 0; run < runs; run++ {
+		svc, _ := newSvc(t, "p1", N)
+		var wg sync.WaitGroup
+		var success, failure atomic.Int64
+		start := make(chan struct{})
+		wg.Add(K)
+		for i := 0; i < K; i++ {
+			go func() {
+				defer wg.Done()
+				<-start
+				_, err := svc.ReserveItem(context.Background(), "p1", "user")
+				if err == nil {
+					success.Add(1)
+				} else if errors.Is(err, domain.ErrOutOfStock) {
+					failure.Add(1)
+				} else {
+					t.Errorf("run %d: unexpected error: %v", run, err)
+				}
+			}()
+		}
+		close(start)
+		wg.Wait()
+		if success.Load() != int64(N) || failure.Load() != int64(K-N) {
+			t.Fatalf("run %d: want %d success %d failure, got %d/%d",
+				run, N, K-N, success.Load(), failure.Load())
+		}
+		avail, _ := svc.GetAvailableStock(context.Background(), "p1")
+		if avail != 0 {
+			t.Fatalf("run %d: want available=0, got %d", run, avail)
+		}
 	}
 }
