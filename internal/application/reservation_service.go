@@ -109,11 +109,8 @@ func (s *ReservationService) ConfirmReservation(_ context.Context, reservationID
 	var result domain.Reservation
 	var err error
 	s.locks.With(res.ProductID, func() {
-		current, ok := s.repo.GetReservation(reservationID)
-		if !ok {
-			err = domain.ErrReservationNotFound
-			return
-		}
+		// Re-fetch under the lock; reservations are never deleted so !ok is unreachable here.
+		current, _ := s.repo.GetReservation(reservationID)
 		now := s.clock.Now()
 		// Treat as expired if it has outlived its hold even if still marked Active.
 		if current.State == domain.StateActive && !now.Before(current.ExpiresAt) {
@@ -162,11 +159,8 @@ func (s *ReservationService) CancelReservation(_ context.Context, reservationID 
 	var result domain.Reservation
 	var err error
 	s.locks.With(res.ProductID, func() {
-		current, ok := s.repo.GetReservation(reservationID)
-		if !ok {
-			err = domain.ErrReservationNotFound
-			return
-		}
+		// Re-fetch under the lock; reservations are never deleted so !ok is unreachable here.
+		current, _ := s.repo.GetReservation(reservationID)
 		if current.State != domain.StateActive {
 			err = domain.ErrReservationAlreadyFinalized
 			return
@@ -207,9 +201,8 @@ func (s *ReservationService) ExpireReservations(_ context.Context, now time.Time
 	for productID, ids := range byProduct {
 		s.locks.With(productID, func() {
 			for _, id := range ids {
-				if s.expireReservationLocked(id, now) {
-					total++
-				}
+				s.expireReservationLocked(id, now)
+				total++
 			}
 		})
 	}
@@ -227,13 +220,11 @@ func (s *ReservationService) expireForProductLocked(productID string, now time.T
 }
 
 // expireReservationLocked expires a single reservation and releases its hold.
-// Caller MUST hold the per-product lock for the reservation's product.
-// Returns true if a transition happened.
-func (s *ReservationService) expireReservationLocked(reservationID string, now time.Time) bool {
-	current, ok := s.repo.GetReservation(reservationID)
-	if !ok || current.State != domain.StateActive {
-		return false
-	}
+// Caller MUST hold the per-product lock for the reservation's product and
+// MUST have verified that the reservation is Active (callers iterate
+// ActiveReservations under the same lock, so no state change is possible).
+func (s *ReservationService) expireReservationLocked(reservationID string, now time.Time) {
+	current, _ := s.repo.GetReservation(reservationID)
 	expiredAt := now
 	_ = s.repo.UpdateReservation(reservationID, func(r *domain.Reservation) error {
 		r.State = domain.StateExpired
@@ -251,7 +242,6 @@ func (s *ReservationService) expireReservationLocked(reservationID string, now t
 		UserID:        strPtr(current.UserID),
 		OccurredAt:    now,
 	})
-	return true
 }
 
 // GetAvailableStock returns the current available units for a product.

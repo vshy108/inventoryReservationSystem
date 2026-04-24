@@ -1,5 +1,5 @@
 bin/
-server
+/server
 /app
 coverage.out
 *.test

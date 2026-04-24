@@ -384,3 +384,49 @@ func TestReserveItem_RepeatedConcurrencyDeterminism(t *testing.T) {
 		}
 	}
 }
+
+// NewReservationService with holdFor=0 falls back to DefaultHoldDuration.
+func TestNewReservationService_DefaultHold(t *testing.T) {
+	repo := infrastructure.NewInMemoryRepository()
+	repo.AddProduct(domain.ProductInventory{ProductID: "p1", TotalStock: 1})
+	clk := infrastructure.NewFakeClock(time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC))
+	svc := application.NewReservationService(repo, infrastructure.NewLockManager(), clk, 0)
+	res, err := svc.ReserveItem(context.Background(), "p1", "userA")
+	if err != nil {
+		t.Fatalf("reserve: %v", err)
+	}
+	if got := res.ExpiresAt.Sub(res.CreatedAt); got != application.DefaultHoldDuration {
+		t.Errorf("want hold=%s, got %s", application.DefaultHoldDuration, got)
+	}
+}
+
+// GetAvailableStock returns ErrProductNotFound for unknown products.
+func TestGetAvailableStock_UnknownProduct(t *testing.T) {
+	svc, _ := newSvc(t, "p1", 1)
+	if _, err := svc.GetAvailableStock(context.Background(), "ghost"); !errors.Is(err, domain.ErrProductNotFound) {
+		t.Errorf("want ErrProductNotFound, got %v", err)
+	}
+}
+
+// Confirming an already-Expired (not just past-expiry-but-Active) reservation
+// returns ErrReservationExpired.
+func TestConfirm_AlreadyExpired(t *testing.T) {
+	svc, clk := newSvc(t, "p1", 1)
+	res, _ := svc.ReserveItem(context.Background(), "p1", "userA")
+	clk.Advance(3 * time.Minute)
+	if n := svc.ExpireReservations(context.Background(), clk.Now()); n != 1 {
+		t.Fatalf("want 1 expired, got %d", n)
+	}
+	_, err := svc.ConfirmReservation(context.Background(), res.ReservationID)
+	if !errors.Is(err, domain.ErrReservationExpired) {
+		t.Errorf("want ErrReservationExpired, got %v", err)
+	}
+}
+
+// GetReservation returns ok=false for unknown IDs.
+func TestGetReservation_Unknown(t *testing.T) {
+	svc, _ := newSvc(t, "p1", 1)
+	if _, ok := svc.GetReservation(context.Background(), "nope"); ok {
+		t.Error("want ok=false for unknown reservation")
+	}
+}

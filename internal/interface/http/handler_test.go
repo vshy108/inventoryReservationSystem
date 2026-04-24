@@ -134,6 +134,34 @@ func TestHTTP_UnknownReservation(t *testing.T) {
 	}
 }
 
+func TestHTTP_GetReservation_OK(t *testing.T) {
+	srv, _ := newServer(t)
+	defer srv.Close()
+	crResp := postJSON(t, srv.URL+"/reservations", map[string]string{
+		"productId": "p1", "userId": "alice",
+	})
+	var created struct {
+		ReservationID string `json:"reservationId"`
+	}
+	_ = json.NewDecoder(crResp.Body).Decode(&created)
+
+	resp, _ := http.Get(srv.URL + "/reservations/" + created.ReservationID)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d", resp.StatusCode)
+	}
+	var got struct {
+		ReservationID string `json:"reservationId"`
+		State         string `json:"state"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&got)
+	if got.ReservationID != created.ReservationID {
+		t.Errorf("want id=%s, got %s", created.ReservationID, got.ReservationID)
+	}
+	if got.State != "Active" {
+		t.Errorf("want Active, got %s", got.State)
+	}
+}
+
 func TestHTTP_BadReserveBody(t *testing.T) {
 	srv, _ := newServer(t)
 	defer srv.Close()
@@ -154,3 +182,82 @@ func TestHTTP_BadReserveBody(t *testing.T) {
 // compile-time assertion that the application service satisfies the interface.
 var _ httpiface.ReservationService = (*application.ReservationService)(nil)
 var _ context.Context = context.Background()
+
+// Exercise each handler's error-path (404/409) so writeServiceError is fully covered.
+func TestHTTP_ErrorPaths(t *testing.T) {
+	srv, _ := newServer(t)
+	defer srv.Close()
+
+	// Unknown product stock -> 404.
+	resp, _ := http.Get(srv.URL + "/products/ghost/stock")
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("stock unknown: want 404, got %d", resp.StatusCode)
+	}
+	// Confirm unknown reservation -> 404.
+	resp, _ = http.Post(srv.URL+"/reservations/nope/confirm", "application/json", nil)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("confirm unknown: want 404, got %d", resp.StatusCode)
+	}
+	// Cancel unknown reservation -> 404.
+	resp, _ = http.Post(srv.URL+"/reservations/nope/cancel", "application/json", nil)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("cancel unknown: want 404, got %d", resp.StatusCode)
+	}
+	// Reserve unknown product -> 404.
+	resp = postJSON(t, srv.URL+"/reservations", map[string]string{
+		"productId": "ghost", "userId": "alice",
+	})
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("reserve unknown product: want 404, got %d", resp.StatusCode)
+	}
+
+	// Create -> confirm once -> confirm again -> 409 (already finalized).
+	crResp := postJSON(t, srv.URL+"/reservations", map[string]string{
+		"productId": "p1", "userId": "alice",
+	})
+	var created struct {
+		ReservationID string `json:"reservationId"`
+	}
+	_ = json.NewDecoder(crResp.Body).Decode(&created)
+	confirmURL := srv.URL + "/reservations/" + created.ReservationID + "/confirm"
+	_, _ = http.Post(confirmURL, "application/json", nil)
+	resp, _ = http.Post(confirmURL, "application/json", nil)
+	if resp.StatusCode != http.StatusConflict {
+		t.Errorf("double confirm: want 409, got %d", resp.StatusCode)
+	}
+}
+
+// writeServiceError's default branch should map unknown errors to 500.
+func TestHTTP_InternalError(t *testing.T) {
+	h := httpiface.NewHandler(failingService{})
+	req := httptest.NewRequest(http.MethodGet, "/products/p1/stock", nil)
+	rr := httptest.NewRecorder()
+	h.Routes().ServeHTTP(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Errorf("want 500, got %d", rr.Code)
+	}
+}
+
+type failingService struct{}
+
+func (failingService) ReserveItem(context.Context, string, string) (domain.Reservation, error) {
+	return domain.Reservation{}, errFailure
+}
+func (failingService) ConfirmReservation(context.Context, string) (domain.Reservation, error) {
+	return domain.Reservation{}, errFailure
+}
+func (failingService) CancelReservation(context.Context, string) (domain.Reservation, error) {
+	return domain.Reservation{}, errFailure
+}
+func (failingService) GetAvailableStock(context.Context, string) (int, error) {
+	return 0, errFailure
+}
+func (failingService) GetReservation(context.Context, string) (domain.Reservation, bool) {
+	return domain.Reservation{}, false
+}
+
+var errFailure = errorString("unexpected")
+
+type errorString string
+
+func (e errorString) Error() string { return string(e) }

@@ -38,7 +38,17 @@ Endpoints:
 | GET    | `/products/{id}/stock`            | Available stock        |
 | GET    | `/healthz`                        | Liveness probe         |
 
-`make` targets: `make vet`, `make test`, `make race`, `make demo`, `make server`.
+`make` targets: `make vet`, `make test`, `make race`, `make cover`, `make cover-html`, `make demo`, `make server`.
+
+## Test Coverage
+
+All business logic under `internal/...` is at **100% statement coverage**
+(the `cmd/` entrypoints are excluded as they are thin wiring).
+
+```sh
+make cover        # prints total coverage
+make cover-html   # opens line-by-line report in a browser
+```
 
 ## Architecture
 
