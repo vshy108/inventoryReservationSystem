@@ -64,7 +64,9 @@ interface  ->  application  ->  domain
   lifecycle. Serializes read-check-write via a per-product mutex.
 - `internal/infrastructure/` — in-memory repository, `LockManager`,
   `Clock` abstraction (`SystemClock`, `FakeClock`).
+- `internal/interface/http/` — HTTP adapter (handlers, routing, error mapping).
 - `cmd/app/` — runnable demo.
+- `cmd/server/` — HTTP entrypoint with graceful shutdown and expiry sweeper.
 
 ## Features by Level
 
