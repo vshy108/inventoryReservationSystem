@@ -63,13 +63,15 @@ func main() {
 	}
 	clk := infrastructure.SystemClock{}
 	svc := application.NewReservationService(repo, infrastructure.NewLockManager(), clk, *hold)
+	metrics := httpiface.NewMetrics()
 
 	mux := http.NewServeMux()
-	mux.Handle("/", httpiface.NewHandler(svc).Routes())
+	mux.Handle("/", metrics.Middleware(httpiface.NewHandler(svc).Routes()))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	})
+	mux.Handle("GET /metrics", metrics.Handler())
 
 	srv := &http.Server{
 		Addr:              *addr,

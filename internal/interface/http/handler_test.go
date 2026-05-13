@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -235,6 +237,47 @@ func TestHTTP_InternalError(t *testing.T) {
 	h.Routes().ServeHTTP(rr, req)
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("want 500, got %d", rr.Code)
+	}
+}
+
+func TestHTTP_MetricsMiddlewareRecordsREDMetrics(t *testing.T) {
+	repo := infrastructure.NewInMemoryRepository()
+	repo.AddProduct(domain.ProductInventory{ProductID: "p1", TotalStock: 1})
+	clk := infrastructure.NewFakeClock(time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC))
+	svc := application.NewReservationService(repo, infrastructure.NewLockManager(), clk, 2*time.Minute)
+	metrics := httpiface.NewMetrics()
+
+	mux := http.NewServeMux()
+	mux.Handle("/", metrics.Middleware(httpiface.NewHandler(svc).Routes()))
+	mux.Handle("GET /metrics", metrics.Handler())
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/products/p1/stock")
+	if err != nil {
+		t.Fatalf("stock request: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("stock request: want 200, got %d", resp.StatusCode)
+	}
+
+	metricsResp, err := http.Get(srv.URL + "/metrics")
+	if err != nil {
+		t.Fatalf("metrics request: %v", err)
+	}
+	body, err := io.ReadAll(metricsResp.Body)
+	if err != nil {
+		t.Fatalf("read metrics: %v", err)
+	}
+	text := string(body)
+	for _, want := range []string{
+		`inventory_http_requests_total{method="GET",route="/products/{id}/stock",status="200"} 1`,
+		`inventory_http_request_duration_seconds_bucket{method="GET",route="/products/{id}/stock",status="200",le="+Inf"} 1`,
+		`inventory_http_request_duration_seconds_count{method="GET",route="/products/{id}/stock",status="200"} 1`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("metrics missing %q in:\n%s", want, text)
+		}
 	}
 }
 
