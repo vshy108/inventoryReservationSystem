@@ -40,7 +40,7 @@ Endpoints:
 
 `make` targets: `make vet`, `make test`, `make race`, `make cover`, `make cover-html`, `make demo`, `make server`.
 
-For the compact command, endpoint, and invariant reference, see [CHEATSHEET.md](CHEATSHEET.md).
+For follow-up work and compact references, see [PLAN.md](PLAN.md) and [CHEATSHEET.md](CHEATSHEET.md).
 
 ## Test Coverage
 
