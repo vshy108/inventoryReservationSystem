@@ -40,6 +40,8 @@ Endpoints:
 
 `make` targets: `make vet`, `make test`, `make race`, `make cover`, `make cover-html`, `make demo`, `make server`.
 
+For the compact command, endpoint, and invariant reference, see [CHEATSHEET.md](CHEATSHEET.md).
+
 ## Test Coverage
 
 All business logic under `internal/...` is at **100% statement coverage**
