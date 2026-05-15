@@ -16,9 +16,9 @@ This plan captures small, verifiable improvements for the Go reservation service
 
 ## S3 — Expiry Sweeper Observability
 
-- [ ] Add lightweight logs or counters for explicit expiry sweeps without changing domain purity.
-- [ ] Document how lazy expiry and explicit sweep interact.
-- [ ] Verify with focused expiry tests plus `go test -race ./...`.
+- [x] Add lightweight logs or counters for explicit expiry sweeps without changing domain purity.
+- [x] Document how lazy expiry and explicit sweep interact.
+- [x] Verify with focused expiry tests plus `go test -race ./...`.
 
 ## S4 — Load And Contention Demo
 

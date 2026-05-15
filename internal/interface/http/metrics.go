@@ -26,9 +26,11 @@ type requestStats struct {
 }
 
 type Metrics struct {
-	mu      sync.Mutex
-	buckets []float64
-	stats   map[metricKey]*requestStats
+	mu                  sync.Mutex
+	buckets             []float64
+	stats               map[metricKey]*requestStats
+	expirySweeps        uint64
+	expiredReservations uint64
 }
 
 func NewMetrics() *Metrics {
@@ -53,6 +55,16 @@ func (m *Metrics) Handler() http.Handler {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 		_, _ = w.Write([]byte(m.render()))
 	})
+}
+
+func (m *Metrics) RecordExpirySweep(expired int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.expirySweeps++
+	if expired > 0 {
+		m.expiredReservations += uint64(expired)
+	}
 }
 
 func (m *Metrics) record(method, route string, status int, duration time.Duration) {
@@ -98,6 +110,14 @@ func (m *Metrics) render() string {
 	})
 
 	var b strings.Builder
+	b.WriteString("# HELP inventory_expiry_sweeps_total Explicit expiry sweeps run by the background worker.\n")
+	b.WriteString("# TYPE inventory_expiry_sweeps_total counter\n")
+	fmt.Fprintf(&b, "inventory_expiry_sweeps_total %d\n", m.expirySweeps)
+
+	b.WriteString("# HELP inventory_expired_reservations_total Reservations expired by explicit sweeps.\n")
+	b.WriteString("# TYPE inventory_expired_reservations_total counter\n")
+	fmt.Fprintf(&b, "inventory_expired_reservations_total %d\n", m.expiredReservations)
+
 	b.WriteString("# HELP inventory_http_requests_total Total HTTP requests handled by the inventory service.\n")
 	b.WriteString("# TYPE inventory_http_requests_total counter\n")
 	for _, key := range keys {

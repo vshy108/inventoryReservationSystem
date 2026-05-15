@@ -38,6 +38,8 @@ Runnable request/response examples with expected status codes live in [docs/api-
 
 Boundary validation rules for IDs and request bodies live in [docs/http-validation.md](docs/http-validation.md).
 
+Explicit expiry sweep counters are exposed on `/metrics` and documented in [docs/expiry-observability.md](docs/expiry-observability.md).
+
 ## Core Invariants
 
 - A reservation starts `Active` and can move to `Confirmed`, `Cancelled`, or `Expired`.

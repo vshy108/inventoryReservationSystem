@@ -83,7 +83,7 @@ func main() {
 	defer stop()
 
 	if *expiryInterval > 0 {
-		go runExpirySweeper(ctx, svc, *expiryInterval)
+		go runExpirySweeper(ctx, svc, metrics, *expiryInterval)
 	}
 
 	go func() {
@@ -102,7 +102,7 @@ func main() {
 	}
 }
 
-func runExpirySweeper(ctx context.Context, svc *application.ReservationService, d time.Duration) {
+func runExpirySweeper(ctx context.Context, svc *application.ReservationService, metrics *httpiface.Metrics, d time.Duration) {
 	ticker := time.NewTicker(d)
 	defer ticker.Stop()
 	for {
@@ -111,6 +111,7 @@ func runExpirySweeper(ctx context.Context, svc *application.ReservationService, 
 			return
 		case now := <-ticker.C:
 			n := svc.ExpireReservations(ctx, now)
+			metrics.RecordExpirySweep(n)
 			if n > 0 {
 				log.Printf("expired %d reservation(s)", n)
 			}

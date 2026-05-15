@@ -327,6 +327,26 @@ func TestHTTP_MetricsMiddlewareRecordsREDMetrics(t *testing.T) {
 	}
 }
 
+func TestHTTP_MetricsExposeExpirySweepCounters(t *testing.T) {
+	metrics := httpiface.NewMetrics()
+	metrics.RecordExpirySweep(0)
+	metrics.RecordExpirySweep(2)
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rr := httptest.NewRecorder()
+	metrics.Handler().ServeHTTP(rr, req)
+
+	text := rr.Body.String()
+	for _, want := range []string{
+		"inventory_expiry_sweeps_total 2",
+		"inventory_expired_reservations_total 2",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("metrics missing %q in:\n%s", want, text)
+		}
+	}
+}
+
 type failingService struct{}
 
 func (failingService) ReserveItem(context.Context, string, string) (domain.Reservation, error) {
