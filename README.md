@@ -24,6 +24,7 @@ This repo matters because it models inventory reservation correctness in Go, a c
 | HTTP boundary validation rules | [docs/http-validation.md](docs/http-validation.md) |
 | Expiry sweeper observability | [docs/expiry-observability.md](docs/expiry-observability.md) |
 | Contention demo and expected single-winner shape | [docs/contention-demo.md](docs/contention-demo.md) |
+| Persistence decision | [docs/persistence-decision.md](docs/persistence-decision.md) |
 | Supporting docs explain tradeoffs and operations | [docs/prompt.md](docs/prompt.md) |
 | Implementation code shows the working system | [internal/interface/http/handler.go](internal/interface/http/handler.go) |
 | Implementation code shows the working system | [cmd/app/main.go](cmd/app/main.go) |
@@ -120,8 +121,9 @@ interface  ->  application  ->  domain
   for correctness in an interview context, and already scales on the
   axis that matters (per-SKU). Different products contend independently.
 - **In-memory only.** The brief states "maintain inventory in memory".
-  The repository is behind a narrow type so a durable store can be added
-  later without touching the domain or service logic.
+  The repository is behind a narrow type, but durable storage remains out of
+  scope until a future slice defines contract tests and migrations first. See
+  [docs/persistence-decision.md](docs/persistence-decision.md).
 - **Lazy expiry inside `ReserveItem`.** Avoids needing a background
   timer goroutine to make the availability check correct. A separate
   `ExpireReservations` sweep is still provided for explicit use.

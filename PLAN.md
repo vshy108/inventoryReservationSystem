@@ -28,6 +28,6 @@ This plan captures small, verifiable improvements for the Go reservation service
 
 ## S5 — Persistence Spike Decision
 
-- [ ] Write a short ADR deciding whether a durable repository is worth adding beyond the current in-memory brief.
-- [ ] If yes, define the repository contract and migration tests before implementing an adapter.
-- [ ] If no, document the reason and keep the in-memory design explicit.
+- [x] Write a short ADR deciding whether a durable repository is worth adding beyond the current in-memory brief.
+- [x] If yes, define the repository contract and migration tests before implementing an adapter.
+- [x] If no, document the reason and keep the in-memory design explicit.
