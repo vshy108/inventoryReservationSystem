@@ -181,6 +181,52 @@ func TestHTTP_BadReserveBody(t *testing.T) {
 	}
 }
 
+func TestHTTP_RejectsUnsupportedReservePayloadShape(t *testing.T) {
+	srv, _ := newServer(t)
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/reservations", "application/json", bytes.NewBufferString(`{"productId":"p1","userId":"alice","quantity":1}`))
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("unknown field: want 400, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Post(srv.URL+"/reservations", "application/json", bytes.NewBufferString(`{"productId":"p1","userId":"alice"}{}`))
+	if err != nil {
+		t.Fatalf("post trailing json: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("trailing json: want 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestHTTP_RejectsInvalidIdentifiersBeforeApplicationService(t *testing.T) {
+	srv, _ := newServer(t)
+	defer srv.Close()
+
+	resp := postJSON(t, srv.URL+"/reservations", map[string]string{"productId": "bad id", "userId": "alice"})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("invalid reserve product id: want 400, got %d", resp.StatusCode)
+	}
+
+	resp = postJSON(t, srv.URL+"/reservations", map[string]string{"productId": "p1", "userId": "bad id"})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("invalid reserve user id: want 400, got %d", resp.StatusCode)
+	}
+
+	resp, _ = http.Get(srv.URL + "/products/bad%20id/stock")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("invalid stock product id: want 400, got %d", resp.StatusCode)
+	}
+
+	resp, _ = http.Post(srv.URL+"/reservations/bad%20id/confirm", "application/json", nil)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("invalid confirm reservation id: want 400, got %d", resp.StatusCode)
+	}
+}
+
 // compile-time assertion that the application service satisfies the interface.
 var _ httpiface.ReservationService = (*application.ReservationService)(nil)
 var _ context.Context = context.Background()

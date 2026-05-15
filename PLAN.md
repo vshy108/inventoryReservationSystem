@@ -10,9 +10,9 @@ This plan captures small, verifiable improvements for the Go reservation service
 
 ## S2 — Boundary Validation Matrix
 
-- [ ] Document request validation rules at the HTTP boundary before inputs reach the application service.
-- [ ] Add tests for invalid product IDs, invalid reservation IDs, and unsupported payload shapes.
-- [ ] Verify with: `make test`.
+- [x] Document request validation rules at the HTTP boundary before inputs reach the application service.
+- [x] Add tests for invalid product IDs, invalid reservation IDs, and unsupported payload shapes.
+- [x] Verify with: `make test`.
 
 ## S3 — Expiry Sweeper Observability
 

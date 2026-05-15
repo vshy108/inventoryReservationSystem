@@ -36,6 +36,8 @@ bash scripts/http_smoke.sh
 
 Runnable request/response examples with expected status codes live in [docs/api-examples.md](docs/api-examples.md).
 
+Boundary validation rules for IDs and request bodies live in [docs/http-validation.md](docs/http-validation.md).
+
 ## Core Invariants
 
 - A reservation starts `Active` and can move to `Confirmed`, `Cancelled`, or `Expired`.

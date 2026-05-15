@@ -2,10 +2,21 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BASE_URL="${BASE_URL:-http://127.0.0.1:18080}"
-ADDR="${BASE_URL#http://}"
 TMP_DIR="$(mktemp -d)"
 SERVER_LOG="$TMP_DIR/server.log"
+
+if [[ -z "${BASE_URL:-}" ]]; then
+  PORT="$(python3 - <<'PY'
+import socket
+
+with socket.socket() as sock:
+    sock.bind(("127.0.0.1", 0))
+    print(sock.getsockname()[1])
+PY
+)"
+  BASE_URL="http://127.0.0.1:$PORT"
+fi
+ADDR="${BASE_URL#http://}"
 
 cleanup() {
   if [[ -n "${SERVER_PID:-}" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
@@ -17,7 +28,8 @@ cleanup() {
 trap cleanup EXIT
 
 cd "$ROOT_DIR"
-go run ./cmd/server --addr="$ADDR" --seed="sku-1:1,sku-2:1" --hold=2m --expiry-interval=0 >"$SERVER_LOG" 2>&1 &
+go build -o "$TMP_DIR/inventory-server" ./cmd/server
+"$TMP_DIR/inventory-server" --addr="$ADDR" --seed="sku-1:1,sku-2:1" --hold=2m --expiry-interval=0 >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 
 ready=false
