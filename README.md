@@ -5,6 +5,25 @@ sales. Reservations are temporary holds on inventory that can be
 **confirmed** into a sale, **cancelled** back to stock, or **expired**
 automatically after a 2-minute hold.
 
+## Repo Metadata
+
+- Repo start date: 2026-04-24
+- Related tech stack versions: Go 1.23.0
+
+## Why This Repo Matters
+
+This repo matters because it models inventory reservation correctness in Go, a compact domain where concurrency and state transitions are easy to reason about.
+
+## Proof Map
+
+| Claim | Where to verify |
+|------|-----------------|
+| Roadmap and acceptance checks | [PLAN.md](PLAN.md) |
+| Quick-reference usage patterns | [CHEATSHEET.md](CHEATSHEET.md) |
+| Supporting docs explain tradeoffs and operations | [docs/prompt.md](docs/prompt.md) |
+| Implementation code shows the working system | [internal/interface/http/handler.go](internal/interface/http/handler.go) |
+| Implementation code shows the working system | [cmd/app/main.go](cmd/app/main.go) |
+
 ## Quickstart
 
 ```sh
