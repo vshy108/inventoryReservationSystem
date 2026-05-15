@@ -4,9 +4,9 @@ This plan captures small, verifiable improvements for the Go reservation service
 
 ## S1 — HTTP Contract Examples
 
-- [ ] Add runnable examples for reserve, confirm, cancel, stock lookup, and liveness endpoints.
-- [ ] Include expected status codes for unknown products, out-of-stock reservations, finalized reservations, and malformed requests.
-- [ ] Verify with: `go test ./...` and a local `go run ./cmd/server` smoke path.
+- [x] Add runnable examples for reserve, confirm, cancel, stock lookup, and liveness endpoints.
+- [x] Include expected status codes for unknown products, out-of-stock reservations, finalized reservations, and malformed requests.
+- [x] Verify with: `go test ./...` and a local `go run ./cmd/server` smoke path.
 
 ## S2 — Boundary Validation Matrix
 

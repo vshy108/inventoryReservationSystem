@@ -20,6 +20,7 @@ This repo matters because it models inventory reservation correctness in Go, a c
 |------|-----------------|
 | Roadmap and acceptance checks | [PLAN.md](PLAN.md) |
 | Quick-reference usage patterns | [CHEATSHEET.md](CHEATSHEET.md) |
+| Runnable HTTP examples and expected statuses | [docs/api-examples.md](docs/api-examples.md) |
 | Supporting docs explain tradeoffs and operations | [docs/prompt.md](docs/prompt.md) |
 | Implementation code shows the working system | [internal/interface/http/handler.go](internal/interface/http/handler.go) |
 | Implementation code shows the working system | [cmd/app/main.go](cmd/app/main.go) |
@@ -30,6 +31,7 @@ This repo matters because it models inventory reservation correctness in Go, a c
 go mod tidy
 go test ./...
 go test -race ./...
+bash scripts/http_smoke.sh
 ```
 
 Run the demo:
@@ -57,9 +59,9 @@ Endpoints:
 | GET    | `/products/{id}/stock`            | Available stock        |
 | GET    | `/healthz`                        | Liveness probe         |
 
-`make` targets: `make vet`, `make test`, `make race`, `make cover`, `make cover-html`, `make demo`, `make server`.
+`make` targets: `make vet`, `make test`, `make race`, `make cover`, `make cover-html`, `make demo`, `make server`, `make http-smoke`.
 
-For follow-up work and compact references, see [PLAN.md](PLAN.md) and [CHEATSHEET.md](CHEATSHEET.md).
+For copy/paste HTTP examples, see [docs/api-examples.md](docs/api-examples.md). For follow-up work and compact references, see [PLAN.md](PLAN.md) and [CHEATSHEET.md](CHEATSHEET.md).
 
 ## Test Coverage
 

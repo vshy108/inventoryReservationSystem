@@ -12,6 +12,7 @@ make race
 make cover
 make demo
 make server
+make http-smoke
 ```
 
 Run the HTTP service:
@@ -19,6 +20,7 @@ Run the HTTP service:
 ```sh
 go run ./cmd/server
 go run ./cmd/server --addr=:9000 --seed="sku-1:5,sku-2:2" --hold=2m
+bash scripts/http_smoke.sh
 ```
 
 ## HTTP Endpoints
@@ -31,6 +33,8 @@ go run ./cmd/server --addr=:9000 --seed="sku-1:5,sku-2:2" --hold=2m
 | `GET` | `/reservations/{id}` | Fetch a reservation |
 | `GET` | `/products/{id}/stock` | Read available stock |
 | `GET` | `/healthz` | Liveness probe |
+
+Runnable request/response examples with expected status codes live in [docs/api-examples.md](docs/api-examples.md).
 
 ## Core Invariants
 

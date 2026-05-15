@@ -1,4 +1,4 @@
-.PHONY: all vet test race cover cover-html demo server tidy clean
+.PHONY: all vet test race cover cover-html demo server http-smoke tidy clean
 
 all: vet test race
 
@@ -23,6 +23,9 @@ demo:
 
 server:
 	go run ./cmd/server
+
+http-smoke:
+	bash scripts/http_smoke.sh
 
 tidy:
 	go mod tidy
