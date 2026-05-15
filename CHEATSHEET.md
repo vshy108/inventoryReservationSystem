@@ -11,6 +11,7 @@ make test
 make race
 make cover
 make demo
+make contention-demo
 make server
 make http-smoke
 ```
@@ -21,6 +22,7 @@ Run the HTTP service:
 go run ./cmd/server
 go run ./cmd/server --addr=:9000 --seed="sku-1:5,sku-2:2" --hold=2m
 bash scripts/http_smoke.sh
+go run ./cmd/contention-demo
 ```
 
 ## HTTP Endpoints
@@ -39,6 +41,8 @@ Runnable request/response examples with expected status codes live in [docs/api-
 Boundary validation rules for IDs and request bodies live in [docs/http-validation.md](docs/http-validation.md).
 
 Explicit expiry sweep counters are exposed on `/metrics` and documented in [docs/expiry-observability.md](docs/expiry-observability.md).
+
+The contention demo should report `successes=1 outOfStock=499 otherErrors=0 available=0` for stock 1 and 500 concurrent attempts. See [docs/contention-demo.md](docs/contention-demo.md).
 
 ## Core Invariants
 

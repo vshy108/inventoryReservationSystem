@@ -1,4 +1,4 @@
-.PHONY: all vet test race cover cover-html demo server http-smoke tidy clean
+.PHONY: all vet test race cover cover-html demo contention-demo server http-smoke tidy clean
 
 all: vet test race
 
@@ -20,6 +20,9 @@ cover-html: cover
 
 demo:
 	go run ./cmd/app
+
+contention-demo:
+	go run ./cmd/contention-demo
 
 server:
 	go run ./cmd/server

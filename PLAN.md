@@ -22,9 +22,9 @@ This plan captures small, verifiable improvements for the Go reservation service
 
 ## S4 — Load And Contention Demo
 
-- [ ] Add a small reviewer-facing load script or command that demonstrates single-winner behavior under contention.
-- [ ] Record the expected success/out-of-stock shape in the README or cheatsheet.
-- [ ] Verify with: `make race`.
+- [x] Add a small reviewer-facing load script or command that demonstrates single-winner behavior under contention.
+- [x] Record the expected success/out-of-stock shape in the README or cheatsheet.
+- [x] Verify with: `make race`.
 
 ## S5 — Persistence Spike Decision
 
