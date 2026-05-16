@@ -14,6 +14,7 @@ make demo
 make contention-demo
 make server
 make http-smoke
+scripts/postgres_migration_smoke.sh
 ```
 
 Run the HTTP service:
@@ -75,4 +76,4 @@ go test -race ./...
 make cover
 ```
 
-Persistence is intentionally not implemented in this slice; the decision and future adapter prerequisites live in [docs/persistence-decision.md](docs/persistence-decision.md).
+The command path remains in-memory. The additive PostgreSQL shadow schema and migration smoke live under `internal/infrastructure/postgres/migrations/` and `scripts/postgres_migration_smoke.sh`; the durable-adapter decision context lives in [docs/persistence-decision.md](docs/persistence-decision.md).

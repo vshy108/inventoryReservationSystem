@@ -31,3 +31,9 @@ This plan captures small, verifiable improvements for the Go reservation service
 - [x] Write a short ADR deciding whether a durable repository is worth adding beyond the current in-memory brief.
 - [x] If yes, define the repository contract and migration tests before implementing an adapter.
 - [x] If no, document the reason and keep the in-memory design explicit.
+
+## S6 — Shadow Persistence Migration Contract
+
+- [x] Add additive PostgreSQL schema migrations for `inventory_items`, `reservations`, `idempotency_keys`, and observe-only `outbox_events`.
+- [x] Keep the in-memory repository as the command source of truth; do not wire a durable adapter in this slice.
+- [x] Verify the migration package with `go test ./...` and a Docker-backed apply/drop smoke using `scripts/postgres_migration_smoke.sh`.

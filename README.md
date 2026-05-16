@@ -120,9 +120,10 @@ interface  ->  application  ->  domain
 - **Per-product `sync.Mutex` over optimistic retry.** Simpler to audit
   for correctness in an interview context, and already scales on the
   axis that matters (per-SKU). Different products contend independently.
-- **In-memory only.** The brief states "maintain inventory in memory".
-  The repository is behind a narrow type, but durable storage remains out of
-  scope until a future slice defines contract tests and migrations first. See
+- **In-memory command path.** The brief states "maintain inventory in memory".
+  The repository is behind a narrow type, and durable command storage remains
+  out of scope. A later shadow-persistence slice added additive PostgreSQL
+  migrations and an apply/drop smoke before any adapter wiring. See
   [docs/persistence-decision.md](docs/persistence-decision.md).
 - **Lazy expiry inside `ReserveItem`.** Avoids needing a background
   timer goroutine to make the availability check correct. A separate

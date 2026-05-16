@@ -27,3 +27,14 @@ Before a durable adapter is added, define a repository contract that covers:
 The repo stays small and reviewable for the concurrency and lifecycle brief. The service is not process-durable: restarting the server loses seeded products, reservations, and events. That limitation is intentional and should remain visible in README and cheatsheet references.
 
 A future persistence slice should start with contract tests and migrations before implementing an adapter. It should not swap storage behind the service first and hope the existing in-memory tests are enough.
+
+## Follow-up: Shadow Migration Contract
+
+The first additive persistence slice now provides PostgreSQL migrations for shadow `inventory_items`, `reservations`, `idempotency_keys`, and observe-only `outbox_events` tables under `internal/infrastructure/postgres/migrations/`. This does not change the command path: `InMemoryRepository` remains the source of truth until a later slice adds a feature-flagged shadow recorder and comparison metrics.
+
+Validate the schema contract with:
+
+```sh
+go test ./...
+scripts/postgres_migration_smoke.sh
+```
