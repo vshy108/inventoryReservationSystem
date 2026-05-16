@@ -37,3 +37,9 @@ This plan captures small, verifiable improvements for the Go reservation service
 - [x] Add additive PostgreSQL schema migrations for `inventory_items`, `reservations`, `idempotency_keys`, and observe-only `outbox_events`.
 - [x] Keep the in-memory repository as the command source of truth; do not wire a durable adapter in this slice.
 - [x] Verify the migration package with `go test ./...` and a Docker-backed apply/drop smoke using `scripts/postgres_migration_smoke.sh`.
+
+## S7 — Shadow Recorder Application Seam
+
+- [x] Add an application-facing `ShadowRecorder` interface with a no-op implementation for default service construction.
+- [x] Emit observe-only shadow records after successful reserve, confirm, cancel, and expire transitions without changing command responses.
+- [x] Verify with focused recorder tests plus `go vet ./...`, `go test ./...`, and `go test -race ./...`.

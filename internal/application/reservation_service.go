@@ -17,11 +17,12 @@ const DefaultHoldDuration = 2 * time.Minute
 // per-product mutex that serializes the read-check-write critical
 // section required to prevent overselling.
 type ReservationService struct {
-	repo      *infrastructure.InMemoryRepository
-	locks     *infrastructure.LockManager
-	clock     infrastructure.Clock
-	holdFor   time.Duration
-	idCounter atomic.Uint64
+	repo           *infrastructure.InMemoryRepository
+	locks          *infrastructure.LockManager
+	clock          infrastructure.Clock
+	holdFor        time.Duration
+	shadowRecorder ShadowRecorder
+	idCounter      atomic.Uint64
 }
 
 // NewReservationService wires a service. A zero holdFor falls back to DefaultHoldDuration.
@@ -31,10 +32,24 @@ func NewReservationService(
 	clock infrastructure.Clock,
 	holdFor time.Duration,
 ) *ReservationService {
+	return NewReservationServiceWithShadowRecorder(repo, locks, clock, holdFor, NoopShadowRecorder{})
+}
+
+// NewReservationServiceWithShadowRecorder wires an observe-only shadow recorder.
+func NewReservationServiceWithShadowRecorder(
+	repo *infrastructure.InMemoryRepository,
+	locks *infrastructure.LockManager,
+	clock infrastructure.Clock,
+	holdFor time.Duration,
+	shadowRecorder ShadowRecorder,
+) *ReservationService {
 	if holdFor == 0 {
 		holdFor = DefaultHoldDuration
 	}
-	return &ReservationService{repo: repo, locks: locks, clock: clock, holdFor: holdFor}
+	if shadowRecorder == nil {
+		shadowRecorder = NoopShadowRecorder{}
+	}
+	return &ReservationService{repo: repo, locks: locks, clock: clock, holdFor: holdFor, shadowRecorder: shadowRecorder}
 }
 
 func (s *ReservationService) nextID(prefix string) string {
@@ -42,22 +57,36 @@ func (s *ReservationService) nextID(prefix string) string {
 }
 
 // appendEvent records an inventory event with a generated EventID.
-func (s *ReservationService) appendEvent(e domain.InventoryEvent) {
+func (s *ReservationService) appendEvent(e domain.InventoryEvent) domain.InventoryEvent {
 	e.EventID = s.nextID("evt")
 	s.repo.AppendEvent(e)
+	return e
+}
+
+func (s *ReservationService) recordShadow(ctx context.Context, action ShadowAction, reservation domain.Reservation, event domain.InventoryEvent) {
+	product, ok := s.repo.GetProduct(reservation.ProductID)
+	if !ok {
+		return
+	}
+	s.shadowRecorder.RecordShadow(ctx, ShadowRecord{
+		Action:      action,
+		Product:     product,
+		Reservation: reservation,
+		Event:       event,
+	})
 }
 
 func strPtr(v string) *string { return &v }
 
 // ReserveItem atomically checks stock and creates an active reservation,
 // or returns ErrOutOfStock / ErrProductNotFound.
-func (s *ReservationService) ReserveItem(_ context.Context, productID, userID string) (domain.Reservation, error) {
+func (s *ReservationService) ReserveItem(ctx context.Context, productID, userID string) (domain.Reservation, error) {
 	var result domain.Reservation
 	var err error
 	s.locks.With(productID, func() {
 		now := s.clock.Now()
 		// Lazily expire stale active reservations so AvailableStock is accurate.
-		s.expireForProductLocked(productID, now)
+		s.expireForProductLocked(ctx, productID, now)
 
 		product, ok := s.repo.GetProduct(productID)
 		if !ok {
@@ -88,20 +117,21 @@ func (s *ReservationService) ReserveItem(_ context.Context, productID, userID st
 			p.ActiveReservationCount++
 			return nil
 		})
-		s.appendEvent(domain.InventoryEvent{
+		event := s.appendEvent(domain.InventoryEvent{
 			Type:          domain.EventReserved,
 			ReservationID: strPtr(res.ReservationID),
 			ProductID:     res.ProductID,
 			UserID:        strPtr(res.UserID),
 			OccurredAt:    now,
 		})
+		s.recordShadow(ctx, ShadowReserved, res, event)
 		result = res
 	})
 	return result, err
 }
 
 // ConfirmReservation converts an active reservation into a confirmed sale.
-func (s *ReservationService) ConfirmReservation(_ context.Context, reservationID string) (domain.Reservation, error) {
+func (s *ReservationService) ConfirmReservation(ctx context.Context, reservationID string) (domain.Reservation, error) {
 	res, ok := s.repo.GetReservation(reservationID)
 	if !ok {
 		return domain.Reservation{}, domain.ErrReservationNotFound
@@ -114,7 +144,7 @@ func (s *ReservationService) ConfirmReservation(_ context.Context, reservationID
 		now := s.clock.Now()
 		// Treat as expired if it has outlived its hold even if still marked Active.
 		if current.State == domain.StateActive && !now.Before(current.ExpiresAt) {
-			s.expireReservationLocked(current.ReservationID, now)
+			s.expireReservationLocked(ctx, current.ReservationID, now)
 			err = domain.ErrReservationExpired
 			return
 		}
@@ -139,19 +169,20 @@ func (s *ReservationService) ConfirmReservation(_ context.Context, reservationID
 			p.ConfirmedCount++
 			return nil
 		})
-		s.appendEvent(domain.InventoryEvent{
+		event := s.appendEvent(domain.InventoryEvent{
 			Type:          domain.EventConfirmed,
 			ReservationID: strPtr(current.ReservationID),
 			ProductID:     current.ProductID,
 			UserID:        strPtr(current.UserID),
 			OccurredAt:    now,
 		})
+		s.recordShadow(ctx, ShadowConfirmed, result, event)
 	})
 	return result, err
 }
 
 // CancelReservation releases an active reservation's hold.
-func (s *ReservationService) CancelReservation(_ context.Context, reservationID string) (domain.Reservation, error) {
+func (s *ReservationService) CancelReservation(ctx context.Context, reservationID string) (domain.Reservation, error) {
 	res, ok := s.repo.GetReservation(reservationID)
 	if !ok {
 		return domain.Reservation{}, domain.ErrReservationNotFound
@@ -177,20 +208,21 @@ func (s *ReservationService) CancelReservation(_ context.Context, reservationID 
 			p.ActiveReservationCount--
 			return nil
 		})
-		s.appendEvent(domain.InventoryEvent{
+		event := s.appendEvent(domain.InventoryEvent{
 			Type:          domain.EventCancelled,
 			ReservationID: strPtr(current.ReservationID),
 			ProductID:     current.ProductID,
 			UserID:        strPtr(current.UserID),
 			OccurredAt:    now,
 		})
+		s.recordShadow(ctx, ShadowCancelled, result, event)
 	})
 	return result, err
 }
 
 // ExpireReservations transitions every active reservation whose ExpiresAt <= now to Expired
 // and releases its inventory hold. Returns the number of reservations expired.
-func (s *ReservationService) ExpireReservations(_ context.Context, now time.Time) int {
+func (s *ReservationService) ExpireReservations(ctx context.Context, now time.Time) int {
 	byProduct := map[string][]string{}
 	for _, r := range s.repo.AllActiveReservations() {
 		if !now.Before(r.ExpiresAt) {
@@ -201,7 +233,7 @@ func (s *ReservationService) ExpireReservations(_ context.Context, now time.Time
 	for productID, ids := range byProduct {
 		s.locks.With(productID, func() {
 			for _, id := range ids {
-				s.expireReservationLocked(id, now)
+				s.expireReservationLocked(ctx, id, now)
 				total++
 			}
 		})
@@ -211,10 +243,10 @@ func (s *ReservationService) ExpireReservations(_ context.Context, now time.Time
 
 // expireForProductLocked expires stale actives for one product.
 // Caller MUST hold the per-product lock.
-func (s *ReservationService) expireForProductLocked(productID string, now time.Time) {
+func (s *ReservationService) expireForProductLocked(ctx context.Context, productID string, now time.Time) {
 	for _, r := range s.repo.ActiveReservationsByProduct(productID) {
 		if !now.Before(r.ExpiresAt) {
-			s.expireReservationLocked(r.ReservationID, now)
+			s.expireReservationLocked(ctx, r.ReservationID, now)
 		}
 	}
 }
@@ -223,7 +255,7 @@ func (s *ReservationService) expireForProductLocked(productID string, now time.T
 // Caller MUST hold the per-product lock for the reservation's product and
 // MUST have verified that the reservation is Active (callers iterate
 // ActiveReservations under the same lock, so no state change is possible).
-func (s *ReservationService) expireReservationLocked(reservationID string, now time.Time) {
+func (s *ReservationService) expireReservationLocked(ctx context.Context, reservationID string, now time.Time) {
 	current, _ := s.repo.GetReservation(reservationID)
 	expiredAt := now
 	_ = s.repo.UpdateReservation(reservationID, func(r *domain.Reservation) error {
@@ -235,13 +267,15 @@ func (s *ReservationService) expireReservationLocked(reservationID string, now t
 		p.ActiveReservationCount--
 		return nil
 	})
-	s.appendEvent(domain.InventoryEvent{
+	event := s.appendEvent(domain.InventoryEvent{
 		Type:          domain.EventExpired,
 		ReservationID: strPtr(current.ReservationID),
 		ProductID:     current.ProductID,
 		UserID:        strPtr(current.UserID),
 		OccurredAt:    now,
 	})
+	expired, _ := s.repo.GetReservation(reservationID)
+	s.recordShadow(ctx, ShadowExpired, expired, event)
 }
 
 // GetAvailableStock returns the current available units for a product.

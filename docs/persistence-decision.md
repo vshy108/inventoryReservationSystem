@@ -30,7 +30,7 @@ A future persistence slice should start with contract tests and migrations befor
 
 ## Follow-up: Shadow Migration Contract
 
-The first additive persistence slice now provides PostgreSQL migrations for shadow `inventory_items`, `reservations`, `idempotency_keys`, and observe-only `outbox_events` tables under `internal/infrastructure/postgres/migrations/`. This does not change the command path: `InMemoryRepository` remains the source of truth until a later slice adds a feature-flagged shadow recorder and comparison metrics.
+The first additive persistence slice now provides PostgreSQL migrations for shadow `inventory_items`, `reservations`, `idempotency_keys`, and observe-only `outbox_events` tables under `internal/infrastructure/postgres/migrations/`. The application layer also exposes a no-op `ShadowRecorder` seam that observes successful reserve, confirm, cancel, and expire transitions without changing command responses. This does not change the command path: `InMemoryRepository` remains the source of truth until a later slice adds a feature-flagged PostgreSQL recorder and comparison metrics.
 
 Validate the schema contract with:
 

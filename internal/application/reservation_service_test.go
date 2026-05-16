@@ -271,6 +271,82 @@ func TestInventoryEventLog_RecordsTransitions(t *testing.T) {
 	}
 }
 
+func TestShadowRecorder_RecordsSuccessfulTransitions(t *testing.T) {
+	repo := infrastructure.NewInMemoryRepository()
+	repo.AddProduct(domain.ProductInventory{ProductID: "p1", TotalStock: 2})
+	clk := infrastructure.NewFakeClock(time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC))
+	recorder := &recordingShadowRecorder{}
+	svc := application.NewReservationServiceWithShadowRecorder(repo, infrastructure.NewLockManager(), clk, 2*time.Minute, recorder)
+
+	first, err := svc.ReserveItem(context.Background(), "p1", "userA")
+	if err != nil {
+		t.Fatalf("reserve first: %v", err)
+	}
+	second, err := svc.ReserveItem(context.Background(), "p1", "userB")
+	if err != nil {
+		t.Fatalf("reserve second: %v", err)
+	}
+	if _, err := svc.ConfirmReservation(context.Background(), first.ReservationID); err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+	if _, err := svc.CancelReservation(context.Background(), second.ReservationID); err != nil {
+		t.Fatalf("cancel: %v", err)
+	}
+	third, err := svc.ReserveItem(context.Background(), "p1", "userC")
+	if err != nil {
+		t.Fatalf("reserve third: %v", err)
+	}
+	clk.Advance(3 * time.Minute)
+	if expired := svc.ExpireReservations(context.Background(), clk.Now()); expired != 1 {
+		t.Fatalf("want 1 expired, got %d", expired)
+	}
+
+	records := recorder.Records()
+	want := []struct {
+		action        application.ShadowAction
+		reservationID string
+		eventType     domain.InventoryEventType
+	}{
+		{application.ShadowReserved, first.ReservationID, domain.EventReserved},
+		{application.ShadowReserved, second.ReservationID, domain.EventReserved},
+		{application.ShadowConfirmed, first.ReservationID, domain.EventConfirmed},
+		{application.ShadowCancelled, second.ReservationID, domain.EventCancelled},
+		{application.ShadowReserved, third.ReservationID, domain.EventReserved},
+		{application.ShadowExpired, third.ReservationID, domain.EventExpired},
+	}
+	if len(records) != len(want) {
+		t.Fatalf("want %d shadow records, got %d", len(want), len(records))
+	}
+	for index, expected := range want {
+		got := records[index]
+		if got.Action != expected.action || got.Reservation.ReservationID != expected.reservationID || got.Event.Type != expected.eventType {
+			t.Fatalf("record %d = (%s, %s, %s), want (%s, %s, %s)", index, got.Action, got.Reservation.ReservationID, got.Event.Type, expected.action, expected.reservationID, expected.eventType)
+		}
+		if got.Event.EventID == "" {
+			t.Fatalf("record %d missing event id", index)
+		}
+	}
+}
+
+type recordingShadowRecorder struct {
+	mu      sync.Mutex
+	records []application.ShadowRecord
+}
+
+func (recorder *recordingShadowRecorder) RecordShadow(_ context.Context, record application.ShadowRecord) {
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	recorder.records = append(recorder.records, record)
+}
+
+func (recorder *recordingShadowRecorder) Records() []application.ShadowRecord {
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	records := make([]application.ShadowRecord, len(recorder.records))
+	copy(records, recorder.records)
+	return records
+}
+
 // EX-R4: ExpireReservations is idempotent; running twice at the same now
 // returns 0 the second time and does not double-release stock.
 func TestExpireReservations_Idempotent(t *testing.T) {
