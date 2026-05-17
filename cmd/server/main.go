@@ -31,6 +31,14 @@ type product struct {
 	stock int
 }
 
+// getEnvOr returns the value of the named env var, or fallback if unset/empty.
+func getEnvOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
 func parseSeed(s string) ([]product, error) {
 	if strings.TrimSpace(s) == "" {
 		return nil, nil
@@ -51,10 +59,32 @@ func parseSeed(s string) ([]product, error) {
 }
 
 func main() {
-	addr := flag.String("addr", ":8080", "listen address")
-	seed := flag.String("seed", "sku-1:1", "comma-separated <productId>:<stock> entries")
-	hold := flag.Duration("hold", application.DefaultHoldDuration, "reservation hold duration")
-	expiryInterval := flag.Duration("expiry-interval", 10*time.Second, "how often to sweep expired reservations (0 disables)")
+	// PORT is set by Railway (and most PaaS platforms); fall back to 8080 for
+	// local and compose runs. ADDR overrides both when a full address is needed.
+	defaultAddr := ":" + getEnvOr("PORT", "8080")
+	if a := os.Getenv("ADDR"); a != "" {
+		defaultAddr = a
+	}
+	addr := flag.String("addr", defaultAddr, "listen address")
+	// INVENTORY_SEED allows seeding products via env var (useful for Railway /
+	// Kubernetes deployments where CLI flags are inconvenient).
+	defaultSeed := getEnvOr("INVENTORY_SEED", "sku-1:1")
+	seed := flag.String("seed", defaultSeed, "comma-separated <productId>:<stock> entries")
+	// INVENTORY_HOLD / INVENTORY_EXPIRY_INTERVAL mirror the CLI flags as env vars.
+	defaultHold := application.DefaultHoldDuration
+	if h := os.Getenv("INVENTORY_HOLD"); h != "" {
+		if parsed, err := time.ParseDuration(h); err == nil {
+			defaultHold = parsed
+		}
+	}
+	defaultExpiry := 10 * time.Second
+	if e := os.Getenv("INVENTORY_EXPIRY_INTERVAL"); e != "" {
+		if parsed, err := time.ParseDuration(e); err == nil {
+			defaultExpiry = parsed
+		}
+	}
+	hold := flag.Duration("hold", defaultHold, "reservation hold duration")
+	expiryInterval := flag.Duration("expiry-interval", defaultExpiry, "how often to sweep expired reservations (0 disables)")
 	flag.Parse()
 
 	products, err := parseSeed(*seed)

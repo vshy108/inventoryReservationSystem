@@ -70,7 +70,30 @@ Endpoints:
 `make` targets: `make vet`, `make test`, `make race`, `make cover`, `make cover-html`, `make demo`, `make contention-demo`, `make server`, `make http-smoke`.
 
 For copy/paste HTTP examples, see [docs/api-examples.md](docs/api-examples.md). For HTTP boundary validation rules, see [docs/http-validation.md](docs/http-validation.md). For expiry sweeper observability, see [docs/expiry-observability.md](docs/expiry-observability.md). For the high-contention demo, see [docs/contention-demo.md](docs/contention-demo.md). For follow-up work and compact references, see [PLAN.md](PLAN.md) and [CHEATSHEET.md](CHEATSHEET.md).
+## Railway Deployment
 
+[`railway.toml`](railway.toml) configures a one-click Railway deployment from the Dockerfile.
+
+**Setup (Railway dashboard):**
+1. New Project → Deploy from GitHub → select this repo
+2. Add a **PostgreSQL** plugin → `DATABASE_URL` is injected automatically
+3. Optionally add a **Redis** plugin → `REDIS_URL` enables distributed locking
+4. Set env vars:
+
+| Variable | Example | Purpose |
+|----------|---------|---------|
+| `INVENTORY_SEED` | `sku-1:100,sku-2:50` | Seed products on startup |
+| `INVENTORY_HOLD` | `2m` | Reservation hold duration (default `2m`) |
+| `DATABASE_URL` | *(injected by PostgreSQL plugin)* | Postgres connection string |
+| `REDIS_URL` | *(injected by Redis plugin, optional)* | Redis for distributed locking |
+
+`PORT` is injected by Railway and picked up automatically. No extra config needed.
+
+```sh
+# Pull and run locally from the Railway-deployed image or with docker-compose:
+DATABASE_URL=postgres://... INVENTORY_SEED=sku-1:100,sku-2:50 \
+  docker run --rm -p 8080:8080 <image>
+```
 ## Test Coverage
 
 All business logic under `internal/...` is at **100% statement coverage**
