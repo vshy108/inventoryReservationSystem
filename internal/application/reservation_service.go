@@ -17,7 +17,7 @@ const DefaultHoldDuration = 2 * time.Minute
 // per-product mutex that serializes the read-check-write critical
 // section required to prevent overselling.
 type ReservationService struct {
-	repo           *infrastructure.InMemoryRepository
+	repo           infrastructure.Repository
 	locks          *infrastructure.LockManager
 	clock          infrastructure.Clock
 	holdFor        time.Duration
@@ -27,7 +27,7 @@ type ReservationService struct {
 
 // NewReservationService wires a service. A zero holdFor falls back to DefaultHoldDuration.
 func NewReservationService(
-	repo *infrastructure.InMemoryRepository,
+	repo infrastructure.Repository,
 	locks *infrastructure.LockManager,
 	clock infrastructure.Clock,
 	holdFor time.Duration,
@@ -37,7 +37,7 @@ func NewReservationService(
 
 // NewReservationServiceWithShadowRecorder wires an observe-only shadow recorder.
 func NewReservationServiceWithShadowRecorder(
-	repo *infrastructure.InMemoryRepository,
+	repo infrastructure.Repository,
 	locks *infrastructure.LockManager,
 	clock infrastructure.Clock,
 	holdFor time.Duration,

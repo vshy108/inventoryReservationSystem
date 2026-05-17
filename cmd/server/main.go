@@ -21,6 +21,7 @@ import (
 	"everest/inventoryReservation/internal/application"
 	"everest/inventoryReservation/internal/domain"
 	"everest/inventoryReservation/internal/infrastructure"
+	pgmigrations "everest/inventoryReservation/internal/infrastructure/postgres/migrations"
 	httpiface "everest/inventoryReservation/internal/interface/http"
 )
 
@@ -61,31 +62,38 @@ func main() {
 		log.Fatalf("invalid --seed: %v", err)
 	}
 
-	repo := infrastructure.NewInMemoryRepository()
+	// Open PostgreSQL when DATABASE_URL is set; otherwise fall back to in-memory.
+	var db *sql.DB
+	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
+		opened, openErr := sql.Open("pgx", dsn)
+		if openErr != nil {
+			log.Fatalf("open postgres: %v", openErr)
+		}
+		opened.SetMaxOpenConns(10)
+		opened.SetMaxIdleConns(3)
+		if err := pgmigrations.RunAll(opened); err != nil {
+			log.Fatalf("run migrations: %v", err)
+		}
+		log.Printf("postgres: migrations applied, using PostgresRepository")
+		db = opened
+	}
+	if db != nil {
+		defer db.Close()
+	}
+
+	// Choose repository implementation based on whether a DB was opened.
+	var repo infrastructure.Repository
+	if db != nil {
+		repo = infrastructure.NewPostgresRepository(db)
+	} else {
+		repo = infrastructure.NewInMemoryRepository()
+	}
 	for _, p := range products {
 		repo.AddProduct(domain.ProductInventory{ProductID: p.id, TotalStock: p.stock})
 	}
 	clk := infrastructure.SystemClock{}
 	svc := application.NewReservationService(repo, infrastructure.NewLockManager(), clk, *hold)
 	metrics := httpiface.NewMetrics()
-
-	// FIX: open optional Postgres/Redis connections so /healthz can probe them.
-	// DATABASE_URL and REDIS_URL are provided by docker-compose (and k8s Secrets).
-	// Without them the service still runs with the in-memory store.
-	var db *sql.DB
-	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
-		opened, openErr := sql.Open("pgx", dsn)
-		if openErr != nil {
-			log.Printf("warn: could not open postgres: %v", openErr)
-		} else {
-			opened.SetMaxOpenConns(3)
-			opened.SetMaxIdleConns(1)
-			db = opened
-		}
-	}
-	if db != nil {
-		defer db.Close()
-	}
 
 	var rdb *redis.Client
 	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
