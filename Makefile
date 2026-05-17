@@ -30,6 +30,9 @@ server:
 http-smoke:
 	bash scripts/http_smoke.sh
 
+load-test:
+	bash scripts/k6_load_test.sh
+
 tidy:
 	go mod tidy
 

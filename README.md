@@ -28,6 +28,8 @@ This repo matters because it models inventory reservation correctness in Go, a c
 | Supporting docs explain tradeoffs and operations | [docs/prompt.md](docs/prompt.md) |
 | OpenAPI 3.0 contract (served at `GET /openapi.yaml`) | [internal/interface/http/openapi.yaml](internal/interface/http/openapi.yaml) |
 | Implementation code shows the working system | [internal/interface/http/handler.go](internal/interface/http/handler.go) |
+| k6 load test script (50 VUs, Postgres-backed compose) | [k6/reservation_load.js](k6/reservation_load.js) |
+| Load test results: 189.9 req/s · p(95) 359 ms · 0.00 % errors | [docs/k6-load-report.md](docs/k6-load-report.md) |
 | Implementation code shows the working system | [cmd/app/main.go](cmd/app/main.go) |
 
 ## Quickstart

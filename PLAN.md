@@ -50,3 +50,11 @@ This plan captures small, verifiable improvements for the Go reservation service
 - [x] Embed the spec in the handler package (`go:embed`) and serve it at `GET /openapi.yaml`.
 - [x] Update README proof map with a link to the spec file.
 - [x] Verify with: `go build ./...` and `curl http://localhost:8080/openapi.yaml` after `go run ./cmd/server`.
+
+## S9 — k6 Load Test Evidence
+
+- [x] Add a k6 script (`k6/reservation_load.js`) targeting `POST /reservations` against the Postgres-backed compose stack.
+- [x] Add a compose override (`docker-compose.loadtest.yml`) seeding `sku-load:1000000` so stock does not exhaust during the test.
+- [x] Add a driver script (`scripts/k6_load_test.sh`) that starts compose, runs k6, saves a Markdown report to `docs/k6-load-report.md`, and tears down.
+- [x] Verify: `bash scripts/k6_load_test.sh` passes all thresholds — p(95) < 500 ms, error rate < 1 %, reservation_created > 0.
+- Results (developer laptop, Docker compose): **8 544 reservations in 45 s · 189.9 req/s · avg 113 ms · p(95) 359 ms · 0.00 % errors**.

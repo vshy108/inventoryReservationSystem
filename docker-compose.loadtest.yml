@@ -1,0 +1,7 @@
+services:
+  inventory:
+    # Override the default seed for load testing.
+    # 1 000 000 units ensures stock does not exhaust during the test so
+    # the happy path (201) dominates and measures pure Postgres round-trip
+    # performance under concurrency.
+    command: ["--seed=sku-load:1000000"]
