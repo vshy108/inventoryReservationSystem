@@ -24,3 +24,10 @@ healthcheckPath = "/healthz"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
+
+# FIX: Each Railway service runs in its own container, so 127.0.0.1 addresses
+# set manually in the dashboard (e.g. from a local compose setup) are unreachable.
+# Using the variable reference syntax tells Railway to substitute the internal
+# Postgres service URL at deploy time, so the app connects to the right host.
+[variables]
+DATABASE_URL = "${{ Postgres.DATABASE_URL }}"
