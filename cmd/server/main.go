@@ -198,8 +198,13 @@ func healthzHandler(db *sql.DB, rdb *redis.Client) http.HandlerFunc {
 			pingErr := rdb.Ping(ctx).Err()
 			cancel()
 			if pingErr != nil {
-				checks["redis"] = "fail: " + pingErr.Error()
-				allOK = false
+				// FIX: Redis is optional — a failed ping should not flip allOK or
+				// return 503.  Returning 503 causes Railway (and any load balancer)
+				// to treat the container as unhealthy and restart it endlessly, even
+				// though the app is fully functional without Redis.  Report the
+				// failure in the JSON body only so operators can see it without
+				// taking the service out of rotation.
+				checks["redis"] = "degraded: " + pingErr.Error()
 			} else {
 				checks["redis"] = "ok"
 			}
