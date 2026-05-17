@@ -8,7 +8,7 @@ automatically after a 2-minute hold.
 ## Repo Metadata
 
 - Repo start date: 2026-04-24
-- Related tech stack versions: Go 1.23.0
+- Related tech stack versions: Go 1.25.0
 
 ## Why This Repo Matters
 
@@ -26,6 +26,7 @@ This repo matters because it models inventory reservation correctness in Go, a c
 | Contention demo and expected single-winner shape | [docs/contention-demo.md](docs/contention-demo.md) |
 | Persistence decision | [docs/persistence-decision.md](docs/persistence-decision.md) |
 | Supporting docs explain tradeoffs and operations | [docs/prompt.md](docs/prompt.md) |
+| OpenAPI 3.0 contract (served at `GET /openapi.yaml`) | [internal/interface/http/openapi.yaml](internal/interface/http/openapi.yaml) |
 | Implementation code shows the working system | [internal/interface/http/handler.go](internal/interface/http/handler.go) |
 | Implementation code shows the working system | [cmd/app/main.go](cmd/app/main.go) |
 

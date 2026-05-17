@@ -1,6 +1,7 @@
 package httpiface
 
 import (
+	_ "embed"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,9 @@ import (
 
 	"everest/inventoryReservation/internal/domain"
 )
+
+//go:embed openapi.yaml
+var openAPISpec []byte
 
 // ReservationService is the subset of the application service used by the
 // HTTP handlers. Declaring it here keeps the interface layer decoupled
@@ -40,6 +44,7 @@ func NewHandler(svc ReservationService) *Handler { return &Handler{svc: svc} }
 //	POST /reservations/{id}/cancel         -> cancel
 //	GET  /reservations/{id}                -> fetch
 //	GET  /products/{id}/stock              -> available stock
+//	GET  /openapi.yaml                     -> OpenAPI 3.0 spec (this package)
 func (h *Handler) Routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /reservations", h.reserve)
@@ -47,6 +52,10 @@ func (h *Handler) Routes() *http.ServeMux {
 	mux.HandleFunc("POST /reservations/{id}/cancel", h.cancel)
 	mux.HandleFunc("GET /reservations/{id}", h.getReservation)
 	mux.HandleFunc("GET /products/{id}/stock", h.stock)
+	mux.HandleFunc("GET /openapi.yaml", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml")
+		_, _ = w.Write(openAPISpec)
+	})
 	return mux
 }
 

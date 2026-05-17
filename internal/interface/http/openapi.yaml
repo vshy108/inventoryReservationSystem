@@ -1,0 +1,311 @@
+openapi: "3.0.3"
+info:
+  title: Inventory Reservation API
+  description: >
+    Prevents overselling during high-concurrency flash sales.
+    Reservations are temporary holds (default 2 minutes) on inventory units
+    that can be confirmed into a sale, cancelled back to available stock,
+    or expired automatically by the background sweeper.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8080
+    description: Local development (go run ./cmd/server or docker compose up)
+
+paths:
+  /reservations:
+    post:
+      summary: Reserve one unit of a product
+      operationId: createReservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReservationRequest"
+            example:
+              productId: sku-1
+              userId: user-42
+      responses:
+        "201":
+          description: Reservation created — unit is held for the configured hold duration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          description: Invalid JSON body, missing required fields, or invalid ID characters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Product is out of stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /reservations/{id}:
+    get:
+      summary: Fetch a reservation by ID
+      operationId: getReservation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]+$"
+          example: res-abc123
+      responses:
+        "200":
+          description: Reservation found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          description: Invalid reservation ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Reservation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /reservations/{id}/confirm:
+    post:
+      summary: Confirm a reservation (convert the hold into a confirmed sale)
+      operationId: confirmReservation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]+$"
+          example: res-abc123
+      responses:
+        "200":
+          description: Reservation confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          description: Invalid reservation ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Reservation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Reservation is already finalized or has expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /reservations/{id}/cancel:
+    post:
+      summary: Cancel a reservation (return the hold back to available stock)
+      operationId: cancelReservation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]+$"
+          example: res-abc123
+      responses:
+        "200":
+          description: Reservation cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          description: Invalid reservation ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Reservation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Reservation is already finalized or has expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/{id}/stock:
+    get:
+      summary: Get the available (unreserved) stock count for a product
+      operationId: getProductStock
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]+$"
+          example: sku-1
+      responses:
+        "200":
+          description: Available stock count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockResponse"
+        "400":
+          description: Invalid product ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /healthz:
+    get:
+      summary: Liveness and dependency probe
+      description: >
+        Returns 200 when all configured dependencies (Postgres, Redis) are reachable.
+        Returns 503 when any dependency is down — load balancers should route away
+        from degraded instances.
+      operationId: healthz
+      responses:
+        "200":
+          description: Service is alive and all dependencies reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                postgres: ok
+                redis: ok
+        "503":
+          description: One or more dependencies are unreachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: degraded
+                postgres: "fail: connection refused"
+
+  /openapi.yaml:
+    get:
+      summary: OpenAPI 3.0 specification (this document)
+      operationId: getOpenAPISpec
+      responses:
+        "200":
+          description: OpenAPI YAML spec
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+components:
+  schemas:
+    ReservationRequest:
+      type: object
+      required: [productId, userId]
+      properties:
+        productId:
+          type: string
+          pattern: "^[A-Za-z0-9_-]+$"
+          description: ID of the product to reserve one unit of
+          example: sku-1
+        userId:
+          type: string
+          pattern: "^[A-Za-z0-9_-]+$"
+          description: ID of the user making the reservation
+          example: user-42
+
+    Reservation:
+      type: object
+      properties:
+        reservationId:
+          type: string
+          example: res-abc123
+        productId:
+          type: string
+          example: sku-1
+        userId:
+          type: string
+          example: user-42
+        state:
+          type: string
+          enum: [Active, Confirmed, Cancelled, Expired]
+          description: >
+            Active — hold is live; Confirmed — hold converted to sale;
+            Cancelled — hold released; Expired — hold lapsed past hold duration
+          example: Active
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+
+    StockResponse:
+      type: object
+      properties:
+        productId:
+          type: string
+          example: sku-1
+        available:
+          type: integer
+          minimum: 0
+          description: Units available for new reservations (total stock minus active holds)
+          example: 3
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+          example: ok
+        postgres:
+          type: string
+          description: Present when DATABASE_URL is configured
+          example: ok
+        redis:
+          type: string
+          description: Present when REDIS_URL is configured
+          example: ok
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: product not found

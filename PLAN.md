@@ -43,3 +43,10 @@ This plan captures small, verifiable improvements for the Go reservation service
 - [x] Add an application-facing `ShadowRecorder` interface with a no-op implementation for default service construction.
 - [x] Emit observe-only shadow records after successful reserve, confirm, cancel, and expire transitions without changing command responses.
 - [x] Verify with focused recorder tests plus `go vet ./...`, `go test ./...`, and `go test -race ./...`.
+
+## S8 — OpenAPI 3.0 Contract
+
+- [x] Write an OpenAPI 3.0 spec covering all HTTP endpoints: `POST /reservations`, confirm, cancel, `GET /reservations/{id}`, `GET /products/{id}/stock`, `GET /healthz`, and `GET /openapi.yaml` itself.
+- [x] Embed the spec in the handler package (`go:embed`) and serve it at `GET /openapi.yaml`.
+- [x] Update README proof map with a link to the spec file.
+- [x] Verify with: `go build ./...` and `curl http://localhost:8080/openapi.yaml` after `go run ./cmd/server`.
