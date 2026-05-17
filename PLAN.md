@@ -58,3 +58,12 @@ This plan captures small, verifiable improvements for the Go reservation service
 - [x] Add a driver script (`scripts/k6_load_test.sh`) that starts compose, runs k6, saves a Markdown report to `docs/k6-load-report.md`, and tears down.
 - [x] Verify: `bash scripts/k6_load_test.sh` passes all thresholds — p(95) < 500 ms, error rate < 1 %, reservation_created > 0.
 - Results (developer laptop, Docker compose): **8 544 reservations in 45 s · 189.9 req/s · avg 113 ms · p(95) 359 ms · 0.00 % errors**.
+
+## S10 — Railway Cloud Deployment
+
+- [x] Add `PORT` / `INVENTORY_SEED` / `INVENTORY_HOLD` / `INVENTORY_EXPIRY_INTERVAL` env var support in `cmd/server/main.go` so all config can be set from the Railway dashboard without CLI flags.
+- [x] Add `railway.toml` with Dockerfile builder, `/healthz` healthcheck, and restart-on-failure policy.
+- [x] Fix `healthzHandler` so a Redis ping failure reports `degraded` in the JSON body only (HTTP 200), not 503 — Redis is optional.
+- [x] Deploy to Railway with a PostgreSQL plugin; `DATABASE_URL` wired via `${{ Postgres.DATABASE_URL }}` dashboard variable.
+- [x] Verify live URL end-to-end: healthz ✅ · stock ✅ · reserve ✅ · confirm ✅ · cancel-after-confirm returns `reservation already finalized` ✅
+- Live URL: **https://inventoryreservationsystem-production.up.railway.app**
