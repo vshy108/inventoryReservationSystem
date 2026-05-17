@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -13,6 +14,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/redis/go-redis/v9"
 
 	"everest/inventoryReservation/internal/application"
 	"everest/inventoryReservation/internal/domain"
@@ -65,12 +69,40 @@ func main() {
 	svc := application.NewReservationService(repo, infrastructure.NewLockManager(), clk, *hold)
 	metrics := httpiface.NewMetrics()
 
+	// FIX: open optional Postgres/Redis connections so /healthz can probe them.
+	// DATABASE_URL and REDIS_URL are provided by docker-compose (and k8s Secrets).
+	// Without them the service still runs with the in-memory store.
+	var db *sql.DB
+	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
+		opened, openErr := sql.Open("pgx", dsn)
+		if openErr != nil {
+			log.Printf("warn: could not open postgres: %v", openErr)
+		} else {
+			opened.SetMaxOpenConns(3)
+			opened.SetMaxIdleConns(1)
+			db = opened
+		}
+	}
+	if db != nil {
+		defer db.Close()
+	}
+
+	var rdb *redis.Client
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		opts, parseErr := redis.ParseURL(redisURL)
+		if parseErr != nil {
+			log.Printf("warn: could not parse REDIS_URL: %v", parseErr)
+		} else {
+			rdb = redis.NewClient(opts)
+		}
+	}
+	if rdb != nil {
+		defer rdb.Close()
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/", metrics.Middleware(httpiface.NewHandler(svc).Routes()))
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	})
+	mux.HandleFunc("GET /healthz", healthzHandler(db, rdb))
 	mux.Handle("GET /metrics", metrics.Handler())
 
 	srv := &http.Server{
@@ -99,6 +131,54 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown error: %v", err)
+	}
+}
+
+// healthzHandler returns a handler that pings Postgres and Redis (when configured)
+// and responds 200 ok / 503 degraded accordingly.
+// FIX: previously returned 200 unconditionally — load balancers would never remove
+// a pod whose DB connection was dead. Now returns 503 when any dependency is down.
+func healthzHandler(db *sql.DB, rdb *redis.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		checks := make(map[string]string)
+		allOK := true
+
+		if db != nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			pingErr := db.PingContext(ctx)
+			cancel()
+			if pingErr != nil {
+				checks["postgres"] = "fail: " + pingErr.Error()
+				allOK = false
+			} else {
+				checks["postgres"] = "ok"
+			}
+		}
+
+		if rdb != nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			pingErr := rdb.Ping(ctx).Err()
+			cancel()
+			if pingErr != nil {
+				checks["redis"] = "fail: " + pingErr.Error()
+				allOK = false
+			} else {
+				checks["redis"] = "ok"
+			}
+		}
+
+		status := "ok"
+		code := http.StatusOK
+		if !allOK {
+			status = "degraded"
+			code = http.StatusServiceUnavailable
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(code)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": status,
+			"checks": checks,
+		})
 	}
 }
 
