@@ -7,7 +7,10 @@
 #   3. Set environment variables (see below)
 #   4. Railway detects the Dockerfile and builds automatically
 #
-# Required env vars (set in Railway dashboard):
+# Required env vars (set in Railway dashboard → service → Variables):
+#   DATABASE_URL     set to ${{ Postgres.DATABASE_URL }} (Railway variable reference
+#                    to the Postgres plugin — do NOT use 127.0.0.1, each service
+#                    runs in its own container)
 #   INVENTORY_SEED   e.g. "sku-1:100,sku-2:50,sku-3:25"
 #
 # Optional env vars:
@@ -25,9 +28,3 @@ healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 
-# FIX: Each Railway service runs in its own container, so 127.0.0.1 addresses
-# set manually in the dashboard (e.g. from a local compose setup) are unreachable.
-# Using the variable reference syntax tells Railway to substitute the internal
-# Postgres service URL at deploy time, so the app connects to the right host.
-[variables]
-DATABASE_URL = "${{ Postgres.DATABASE_URL }}"
