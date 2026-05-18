@@ -19,7 +19,10 @@ docker run --rm -d \
   -p "127.0.0.1:${pg_port}:5432" \
   postgres:18-alpine >/dev/null
 
-until docker exec "$container_name" pg_isready -U inventory -d inventory >/dev/null 2>&1; do
+# FIX: pg_isready can report that Postgres accepts connections before the
+# target database is usable. Wait on a real query so migrations do not race
+# database creation during fast local runs.
+until docker exec "$container_name" psql -v ON_ERROR_STOP=1 -U inventory -d inventory -c 'SELECT 1' >/dev/null 2>&1; do
   sleep 1
 done
 
