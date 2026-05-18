@@ -66,4 +66,4 @@ This plan captures small, verifiable improvements for the Go reservation service
 - [x] Fix `healthzHandler` so a Redis ping failure reports `degraded` in the JSON body only (HTTP 200), not 503 — Redis is optional.
 - [x] Deploy to Railway with a PostgreSQL plugin; `DATABASE_URL` wired via `${{ Postgres.DATABASE_URL }}` dashboard variable.
 - [x] Verify live URL end-to-end: healthz ✅ · stock ✅ · reserve ✅ · confirm ✅ · cancel-after-confirm returns `reservation already finalized` ✅
-- Live URL: **https://inventoryreservationsystem-production.up.railway.app**
+- Live URL: **https://inventoryreservationsystem-production.up.railway.app** *(deployment verified May 2026; removed from Railway to free up free-tier slot)*
